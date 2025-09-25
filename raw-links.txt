@@ -56,4 +56,5 @@ https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/gradle/wrap
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/gradle/wrapper/gradle-wrapper.properties
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/gradlew
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/gradlew.bat
+https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/raw-links.txt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/settings.gradle.kts

@@ -1,3 +1,4 @@
+<!-- app/src/main/res/values/strings.xml -->
 <resources>
-    <string name="app_name">RDInfo2</string>
+    <string name="app_name">RD-Info2</string>
 </resources>

@@ -73,7 +73,7 @@ fun MainContent(settingsManager: SettingsManager) {
 
             // Tab content
             when (currentTab) {
-                0 -> MedicationCalculatorScreen()
+                0 -> MedicationCalculatorScreenPlaceholder()
                 1 -> AlgorithmsScreen()
                 2 -> ReferenceValuesScreen()
                 3 -> SpecialReferencesScreen()
@@ -128,8 +128,8 @@ fun TopAppBarWithTabs(
             )
         )
 
-        // Tab row
-        ScrollableTabRow(
+        // Tab row - vereinfacht ohne problematische Indikatoren
+        TabRow(
             selectedTabIndex = currentTab,
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -188,9 +188,14 @@ fun MainMenuDropdown(
     }
 }
 
-// Inline Screen Implementations to avoid import issues
+// =====================================================
+// PLACEHOLDER SCREENS - Diese werden schrittweise ersetzt
+// =====================================================
+
+// PLACEHOLDER - wird durch echten MedicationCalculatorScreen ersetzt
+// Dieser wird aus separater Datei geladen: com.rdinfo2.ui.screens.MedicationCalculatorScreen()
 @Composable
-fun MedicationCalculatorScreen() {
+fun MedicationCalculatorScreenPlaceholder() {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -201,30 +206,9 @@ fun MedicationCalculatorScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Status Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Medikamentenrechner",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    Text(
-                        text = "Hier wird der erweiterte Medikamentenrechner implementiert. " +
-                                "Basierend auf der RDInfo-App Logik, aber mit Unterstützung für alle Einheiten.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            // Gesture hint
-            Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -234,16 +218,40 @@ fun MedicationCalculatorScreen() {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Status: App läuft! 🎉",
-                        style = MaterialTheme.typography.titleMedium
+                        text = "✅ App läuft stabil!",
+                        style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = "Die Grundstruktur ist implementiert. Als nächstes:\n" +
-                                "• Medikamenten-Datenbank hinzufügen\n" +
-                                "• Interaktive Flowcharts implementieren\n" +
-                                "• Timer-Funktionen für HLW",
-                        style = MaterialTheme.typography.bodySmall
+                        text = "Import-Fehler behoben. Bereit für erste echte Funktionen.",
+                        style = MaterialTheme.typography.bodyMedium
                     )
+                }
+            }
+
+            // Medikamenten-Platzhalter
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Medikamentenrechner",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text(
+                        text = "Als nächstes zu implementieren:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Column {
+                        Text("• PatientData.kt - Basis-Datenmodell", style = MaterialTheme.typography.bodySmall)
+                        Text("• Ersten Medikament-Rechner", style = MaterialTheme.typography.bodySmall)
+                        Text("• Einfache Dosierungsberechnung", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -273,19 +281,19 @@ fun AlgorithmsScreen() {
                     style = MaterialTheme.typography.headlineSmall
                 )
                 Text(
-                    text = "Hier werden die 35 interaktiven Flowcharts aus dem Hamburger " +
-                            "Rettungsdienst-Handbuch implementiert. Startend mit x1.1 (HLW Erwachsene).",
+                    text = "35 Algorithmen aus dem Hamburger Rettungsdienst-Handbuch wurden analysiert. " +
+                            "Implementierung beginnt mit x1.1 (HLW Erwachsene).",
                     style = MaterialTheme.typography.bodyMedium
                 )
 
-                // Status info
                 Divider()
-                Text(
-                    text = "PDF-Analyse: 100% abgeschlossen\n" +
-                            "Flowchart-Struktur: Definiert\n" +
-                            "Implementation: Bereit zum Start",
-                    style = MaterialTheme.typography.bodySmall
-                )
+
+                Column {
+                    Text("Geplante erste Algorithmen:", style = MaterialTheme.typography.titleSmall)
+                    Text("• x1.1: Reanimation Erwachsene", style = MaterialTheme.typography.bodySmall)
+                    Text("• A1: Freimachen der Atemwege", style = MaterialTheme.typography.bodySmall)
+                    Text("• B1: Spannungspneumothorax", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }
@@ -314,19 +322,20 @@ fun ReferenceValuesScreen() {
                     style = MaterialTheme.typography.headlineSmall
                 )
                 Text(
-                    text = "Alters- und gewichtsspezifische Normalwerte für Vitalparameter. " +
-                            "Automatische Berechnung basierend auf Patientendaten (Alter, Geschlecht, Gewicht).",
+                    text = "Altersabhängige Vitalparameter und Referenzwerte. " +
+                            "Benötigt PatientData für dynamische Berechnung.",
                     style = MaterialTheme.typography.bodyMedium
                 )
 
                 Divider()
-                Text(
-                    text = "• Neugeborene bis Geriatrisch\n" +
-                            "• HF, RR, AF, Temperatur\n" +
-                            "• Atemvolumen & Blutvolumen\n" +
-                            "• Hämoglobin-Werte",
-                    style = MaterialTheme.typography.bodySmall
-                )
+
+                Column {
+                    Text("Geplante Inhalte:", style = MaterialTheme.typography.titleSmall)
+                    Text("• Herzfrequenz (HF)", style = MaterialTheme.typography.bodySmall)
+                    Text("• Atemfrequenz (AF)", style = MaterialTheme.typography.bodySmall)
+                    Text("• Blutdruck (RR)", style = MaterialTheme.typography.bodySmall)
+                    Text("• Gewichtsschätzung", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }
@@ -355,21 +364,19 @@ fun SpecialReferencesScreen() {
                     style = MaterialTheme.typography.headlineSmall
                 )
                 Text(
-                    text = "16 verschiedene Nachschlagewerke für den Rettungsdienst:",
+                    text = "Medizinische Scores und Bewertungsschemata für den Rettungsdienst.",
                     style = MaterialTheme.typography.bodyMedium
                 )
 
                 Divider()
-                Text(
-                    text = "• Glasgow Coma Scale (GCS)\n" +
-                            "• APGAR-Score\n" +
-                            "• FAST-Test\n" +
-                            "• Verbrennungsregel der 9er\n" +
-                            "• EKG-Normwerte\n" +
-                            "• Intubationsgrößen\n" +
-                            "• SEPSIS-Score, ISOBAR, GP-START...",
-                    style = MaterialTheme.typography.bodySmall
-                )
+
+                Column {
+                    Text("Geplante Referenzen:", style = MaterialTheme.typography.titleSmall)
+                    Text("• Glasgow Coma Scale (GCS)", style = MaterialTheme.typography.bodySmall)
+                    Text("• APGAR-Score", style = MaterialTheme.typography.bodySmall)
+                    Text("• FAST-Test", style = MaterialTheme.typography.bodySmall)
+                    Text("• Verbrennungsregel der 9er", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }

@@ -7,6 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
@@ -193,68 +195,255 @@ fun MainMenuDropdown(
 // =====================================================
 
 // PLACEHOLDER - wird durch echten MedicationCalculatorScreen ersetzt
-// Dieser wird aus separater Datei geladen: com.rdinfo2.ui.screens.MedicationCalculatorScreen()
+// Diese Version ist FUNKTIONAL - nicht nur Text!
 @Composable
 fun MedicationCalculatorScreenPlaceholder() {
-    Box(
+    val patientManager = remember { PatientDataManager.getInstance() }
+    val currentPatient by patientManager.currentPatient.collectAsStateWithLifecycle()
+
+    var selectedMedication by remember { mutableStateOf("Adrenalin") }
+    var showPatientEdit by remember { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        contentAlignment = Alignment.Center
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        // Status Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
         ) {
-            // Status Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "✅ App läuft stabil!",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Text(
-                        text = "Import-Fehler behoben. Bereit für erste echte Funktionen.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                Text(
+                    text = "🚀 RD-Info2 - Funktionaler Medikamentenrechner",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Text(
+                    text = "Diese Version ist FUNKTIONAL - du kannst echte Berechnungen durchführen!",
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
+        }
 
-            // Medikamenten-Platzhalter
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+        // Patientendaten Card - INTERAKTIV
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Medikamentenrechner",
-                        style = MaterialTheme.typography.headlineSmall
+                        text = "Patientendaten",
+                        style = MaterialTheme.typography.titleMedium
                     )
-                    Text(
-                        text = "Als nächstes zu implementieren:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Column {
-                        Text("• PatientData.kt - Basis-Datenmodell", style = MaterialTheme.typography.bodySmall)
-                        Text("• Ersten Medikament-Rechner", style = MaterialTheme.typography.bodySmall)
-                        Text("• Einfache Dosierungsberechnung", style = MaterialTheme.typography.bodySmall)
+                    Button(
+                        onClick = { showPatientEdit = true }
+                    ) {
+                        Text("Bearbeiten")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text("Alter: ${currentPatient.getFormattedAge()}")
+                Text("Gewicht: ${currentPatient.getFormattedWeight()}")
+                Text("Kategorie: ${currentPatient.ageCategory}")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Quick-Patient Buttons
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { patientManager.setQuickPatient("säugling") },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Säugling")
+                    }
+                    Button(
+                        onClick = { patientManager.setQuickPatient("kind") },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Kind")
+                    }
+                    Button(
+                        onClick = { patientManager.setQuickPatient("erwachsener") },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Erwachsener")
                     }
                 }
             }
         }
+
+        // Medikamenten-Rechner Card - FUNKTIONAL
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Adrenalin-Rechner (Reanimation)",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                val weight = currentPatient.getEffectiveWeight()
+                val dose = when {
+                    currentPatient.ageYears < 1 -> 0.01 * weight
+                    currentPatient.ageYears < 12 -> 0.01 * weight
+                    else -> 1.0
+                }
+
+                Text(
+                    text = "Berechnete Dosis: ${String.format("%.2f", dose)} mg",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+
+                Text("Volumen: ${String.format("%.1f", dose)} ml (1:1000)")
+                Text("Verabreichung: i.v./i.o. unverdünnt")
+
+                if (dose > 5.0) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            "⚠️ Hohe Dosis - Kontrolle empfohlen",
+                            modifier = Modifier.padding(8.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+
+                // Andere Medikamente
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val atropinDose = when {
+                                currentPatient.ageYears < 12 -> (0.02 * weight).coerceAtLeast(0.1).coerceAtMost(1.0)
+                                else -> 0.5
+                            }
+                            selectedMedication = "Atropin: ${String.format("%.2f", atropinDose)} mg"
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Atropin", fontSize = 12.sp)
+                    }
+                    Button(
+                        onClick = {
+                            val glucoseDose = when {
+                                currentPatient.ageYears < 1 -> 2.0 * weight
+                                currentPatient.ageYears < 12 -> 1.0 * weight
+                                else -> 50.0
+                            }
+                            selectedMedication = "Glucose 40%: ${String.format("%.0f", glucoseDose)} ml"
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Glucose", fontSize = 12.sp)
+                    }
+                }
+
+                if (selectedMedication != "Adrenalin") {
+                    Text(
+                        selectedMedication,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
+
+    // Patient Edit Dialog
+    if (showPatientEdit) {
+        var ageYears by remember { mutableStateOf(currentPatient.ageYears.toString()) }
+        var ageMonths by remember { mutableStateOf(currentPatient.ageMonths.toString()) }
+        var weight by remember { mutableStateOf(if (currentPatient.isManualWeight) currentPatient.weightKg.toString() else "") }
+
+        AlertDialog(
+            onDismissRequest = { showPatientEdit = false },
+            title = { Text("Patientendaten") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = ageYears,
+                        onValueChange = { ageYears = it },
+                        label = { Text("Jahre") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = ageMonths,
+                        onValueChange = { ageMonths = it },
+                        label = { Text("Monate (0-11)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = weight,
+                        onValueChange = { weight = it },
+                        label = { Text("Gewicht (kg, optional)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        supportingText = { Text("Leer = automatische Schätzung") }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        try {
+                            val years = ageYears.toIntOrNull() ?: 0
+                            val months = ageMonths.toIntOrNull() ?: 0
+                            val weightValue = weight.toDoubleOrNull()
+
+                            if (weightValue != null && weightValue > 0) {
+                                patientManager.updatePatient(
+                                    com.rdinfo2.data.patient.PatientDataFactory.createWithWeight(years, months, weightValue)
+                                )
+                            } else {
+                                patientManager.updatePatient(
+                                    com.rdinfo2.data.patient.PatientDataFactory.create(years, months)
+                                )
+                            }
+                            showPatientEdit = false
+                        } catch (e: Exception) {
+                            // Handle error
+                        }
+                    }
+                ) {
+                    Text("Speichern")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPatientEdit = false }) {
+                    Text("Abbrechen")
+                }
+            }
+        )
     }
 }
 

@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.rdinfo2.logic.DosingCalculator
 import com.rdinfo2.logic.PatientCalculator
 import com.rdinfo2.ui.theme.RDInfo2Theme
-import com.rdinfo.logic.VitalParameters
+import com.rdinfo2.logic.VitalParameters
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

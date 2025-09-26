@@ -20,6 +20,7 @@ https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/mai
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/data/preferences/SettingsManager.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/logic/DosingCalculator.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/logic/PatientCalculator.kt
+https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/logic/VitalParameters.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/theme/Color.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/theme/EmergencyComponents.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/theme/Shape.kt

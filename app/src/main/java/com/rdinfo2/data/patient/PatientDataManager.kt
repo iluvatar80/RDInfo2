@@ -79,14 +79,14 @@ object PatientDataManager {
      * Gewicht aktualisieren (manuell oder automatisch)
      */
     fun updateWeight(weight: Double?, isManual: Boolean = true) {
-        currentPatient = if (weight != null && weight > 0) {
-            currentPatient.copy(
+        if (weight != null && weight > 0) {
+            currentPatient = currentPatient.copy(
                 weightKg = weight.coerceIn(0.5, 300.0),
                 isManualWeight = isManual
             )
         } else {
             // Wenn null oder 0, dann automatische Schätzung
-            currentPatient.copy(
+            currentPatient = currentPatient.copy(
                 weightKg = calculateEstimatedWeight(),
                 isManualWeight = false
             )
@@ -136,9 +136,15 @@ object PatientDataManager {
      * Schwangerschaftsstatus aktualisieren
      */
     fun updatePregnancy(isPregnant: Boolean, weekOfPregnancy: Int? = null) {
+        val validWeek = if (isPregnant && weekOfPregnancy != null) {
+            weekOfPregnancy.coerceIn(1, 42)
+        } else {
+            null
+        }
+
         currentPatient = currentPatient.copy(
             isPregnant = isPregnant,
-            weekOfPregnancy = if (isPregnant) weekOfPregnancy?.coerceIn(1, 42) else null
+            weekOfPregnancy = validWeek
         )
         recalculateAndPersist()
     }
@@ -150,8 +156,13 @@ object PatientDataManager {
      */
     private fun calculateValues(): CalculatedPatientValues {
         val totalMonths = currentPatient.ageYears * 12 + currentPatient.ageMonths
-        val effectiveWeight = if (currentPatient.weightKg > 0) currentPatient.weightKg else calculateEstimatedWeight()
         val estimatedWeight = calculateEstimatedWeight()
+
+        val effectiveWeight = if (currentPatient.weightKg > 0) {
+            currentPatient.weightKg
+        } else {
+            estimatedWeight
+        }
 
         return CalculatedPatientValues(
             totalAgeMonths = totalMonths,
@@ -171,59 +182,57 @@ object PatientDataManager {
     private fun calculateEstimatedWeight(): Double {
         val totalMonths = currentPatient.ageYears * 12 + currentPatient.ageMonths
 
-        return when {
-            // Säuglinge (0-12 Monate): WHO Empirische Werte
-            totalMonths <= 12 -> {
-                when (totalMonths) {
-                    0 -> 3.5
-                    1 -> 4.5
-                    2 -> 5.5
-                    3 -> 6.5
-                    4 -> 7.0
-                    5 -> 7.5
-                    6 -> 8.0
-                    7 -> 8.5
-                    8 -> 9.0
-                    9 -> 9.5
-                    10 -> 10.0
-                    11 -> 10.5
-                    12 -> 11.0
-                    else -> 11.0
-                }
+        // Säuglinge (0-12 Monate): WHO Empirische Werte
+        if (totalMonths <= 12) {
+            return when (totalMonths) {
+                0 -> 3.5
+                1 -> 4.5
+                2 -> 5.5
+                3 -> 6.5
+                4 -> 7.0
+                5 -> 7.5
+                6 -> 8.0
+                7 -> 8.5
+                8 -> 9.0
+                9 -> 9.5
+                10 -> 10.0
+                11 -> 10.5
+                12 -> 11.0
+                else -> 11.0
             }
+        }
 
-            // Kleinkinder (1-5 Jahre): WHO Formel
-            currentPatient.ageYears <= 5 -> {
-                2.0 * currentPatient.ageYears + 8.0
+        // Kleinkinder (1-5 Jahre): WHO Formel
+        if (currentPatient.ageYears <= 5) {
+            return 2.0 * currentPatient.ageYears + 8.0
+        }
+
+        // Kinder (6-12 Jahre): Erweiterte pädiatrische Formel
+        if (currentPatient.ageYears <= 12) {
+            return (currentPatient.ageYears * 2.5) + 10.0
+        }
+
+        // Jugendliche (13-17 Jahre): Pubertäts-adaptierte Formel
+        if (currentPatient.ageYears in 13..17) {
+            return 45.0 + ((currentPatient.ageYears - 13) * 5.0)
+        }
+
+        return when (currentPatient.gender) {
+            PatientGender.MALE -> {
+                if (currentPatient.ageYears >= 65) 72.0 else 75.0
             }
-
-            // Kinder (6-12 Jahre): Erweiterte pädiatrische Formel
-            currentPatient.ageYears <= 12 -> {
-                (currentPatient.ageYears * 2.5) + 10.0
-            }
-
-            // Jugendliche (13-17 Jahre): Pubertäts-adaptierte Formel
-            currentPatient.ageYears in 13..17 -> {
-                45.0 + ((currentPatient.ageYears - 13) * 5.0)
-            }
-
-            // Erwachsene: Geschlechtsabhängig
-            else -> when (currentPatient.gender) {
-                PatientGender.MALE -> when {
-                    currentPatient.ageYears >= 65 -> 72.0  // Altersbedingte Reduktion
-                    else -> 75.0
-                }
-                PatientGender.FEMALE -> when {
+            PatientGender.FEMALE -> {
+                when {
                     currentPatient.isPregnant == true -> {
                         val baseWeight = 65.0
                         val pregnancyWeeks = currentPatient.weekOfPregnancy ?: 20
-                        baseWeight + (pregnancyWeeks * 0.5)  // Schwangerschaftsgewichtszunahme
+                        baseWeight + (pregnancyWeeks * 0.5)
                     }
-                    currentPatient.ageYears >= 65 -> 62.0  // Altersbedingte Reduktion
+                    currentPatient.ageYears >= 65 -> 62.0
                     else -> 65.0
                 }
-                PatientGender.UNKNOWN -> 70.0
             }
+            PatientGender.UNKNOWN -> 70.0
         }
     }
 
@@ -248,72 +257,83 @@ object PatientDataManager {
         // Schwangerschaftsrisiken
         if (currentPatient.isPregnant == true) {
             val week = currentPatient.weekOfPregnancy ?: 20
-            if (week < 12) {
-                risks.add(
+            when {
+                week < 12 -> risks.add(
                     RiskFactor("pregnancy_early", "Frühschwangerschaft", "Erhöhtes Abortrisiko", RiskSeverity.HIGH)
                 )
-            } else if (week > 37) {
-                risks.add(
+                week > 37 -> risks.add(
                     RiskFactor("pregnancy_term", "Terminnahe Schwangerschaft", "Geburtsrisiko", RiskSeverity.HIGH)
                 )
+                else -> {
+                    // Normale Schwangerschaft, keine zusätzlichen Risiken
+                }
             }
         }
 
         // Gewichtsrisiken
         val bmi = if (currentPatient.ageYears >= 18) {
-            // BMI nur für Erwachsene berechnen
             val heightM = estimateHeight() / 100.0
             calculatedValues.effectiveWeight / (heightM * heightM)
-        } else null
+        } else {
+            null
+        }
 
         bmi?.let { bmiValue ->
-            if (bmiValue < 18.5) {
-                risks.add(
+            when {
+                bmiValue < 18.5 -> risks.add(
                     RiskFactor("weight_underweight", "Untergewicht", "BMI < 18.5, Malnutrition möglich", RiskSeverity.MEDIUM)
                 )
-            } else if (bmiValue > 30) {
-                risks.add(
+                bmiValue > 30 -> risks.add(
                     RiskFactor("weight_obesity", "Adipositas", "BMI > 30, erschwerte Atemwege", RiskSeverity.MEDIUM)
                 )
+                else -> {
+                    // Normales Gewicht, keine Risiken
+                }
             }
         }
 
         // Vitalparameter-Risiken
         currentPatient.vitals?.let { vitals ->
             vitals.systolicBP?.let { sbp ->
-                if (sbp < 90) {
-                    risks.add(
+                when {
+                    sbp < 90 -> risks.add(
                         RiskFactor("bp_low", "Hypotonie", "RR sys < 90 mmHg", RiskSeverity.HIGH)
                     )
-                } else if (sbp > 180) {
-                    risks.add(
+                    sbp > 180 -> risks.add(
                         RiskFactor("bp_high", "Hypertonie", "RR sys > 180 mmHg", RiskSeverity.HIGH)
                     )
+                    else -> {
+                        // Normaler Blutdruck, keine Risiken
+                    }
                 }
             }
 
             vitals.heartRate?.let { hr ->
                 val normalRange = getNormalHeartRateRange()
-                if (hr < normalRange.first) {
-                    risks.add(
+                when {
+                    hr < normalRange.first -> risks.add(
                         RiskFactor("hr_low", "Bradykardie", "HF < ${normalRange.first}/min", RiskSeverity.MEDIUM)
                     )
-                } else if (hr > normalRange.second) {
-                    risks.add(
+                    hr > normalRange.second -> risks.add(
                         RiskFactor("hr_high", "Tachykardie", "HF > ${normalRange.second}/min", RiskSeverity.MEDIUM)
                     )
+                    else -> {
+                        // Normale Herzfrequenz, keine Risiken
+                    }
                 }
             }
 
             vitals.oxygenSaturation?.let { spo2 ->
-                if (spo2 < 90) {
-                    risks.add(
+                when {
+                    spo2 < 90 -> risks.add(
                         RiskFactor("spo2_critical", "Schwere Hypoxie", "SpO2 < 90%", RiskSeverity.CRITICAL)
                     )
-                } else if (spo2 < 95) {
-                    risks.add(
+                    spo2 < 95 -> risks.add(
                         RiskFactor("spo2_low", "Hypoxie", "SpO2 < 95%", RiskSeverity.HIGH)
                     )
+                    else -> {
+                        // Normale Sauerstoffsättigung, keine Risiken
+                    }
                 }
             }
         }
@@ -332,11 +352,14 @@ object PatientDataManager {
      * Körpergröße schätzen (für BMI-Berechnung)
      */
     private fun estimateHeight(): Double {
-        return when {
-            currentPatient.ageYears < 18 -> 100.0 + (currentPatient.ageYears * 5.0)  // Vereinfachte Schätzung für Kinder
-            currentPatient.gender == PatientGender.MALE -> 175.0
-            currentPatient.gender == PatientGender.FEMALE -> 165.0
-            else -> 170.0
+        return if (currentPatient.ageYears < 18) {
+            100.0 + (currentPatient.ageYears * 5.0)  // Vereinfachte Schätzung für Kinder
+        } else {
+            when (currentPatient.gender) {
+                PatientGender.MALE -> 175.0
+                PatientGender.FEMALE -> 165.0
+                PatientGender.UNKNOWN -> 170.0
+            }
         }
     }
 
@@ -464,12 +487,10 @@ object PatientDataManager {
         } else {
             "${currentPatient.ageYears} Jahre"
         }
-        val genderStr = if (currentPatient.gender == PatientGender.MALE) {
-            "männlich"
-        } else if (currentPatient.gender == PatientGender.FEMALE) {
-            "weiblich"
-        } else {
-            "unbekannt"
+        val genderStr = when (currentPatient.gender) {
+            PatientGender.MALE -> "männlich"
+            PatientGender.FEMALE -> "weiblich"
+            PatientGender.UNKNOWN -> "unbekannt"
         }
 
         return "$ageStr, $weight kg$weightSuffix, $genderStr"
@@ -483,7 +504,9 @@ object PatientDataManager {
         val classification = getAgeClassification()
         val risks = if (calculatedValues.riskFactors.isNotEmpty()) {
             "\nRisiken: ${calculatedValues.riskFactors.joinToString(", ") { it.name }}"
-        } else ""
+        } else {
+            ""
+        }
 
         return "$summary\n$classification$risks"
     }
@@ -494,12 +517,10 @@ object PatientDataManager {
     val ageYears: Int get() = currentPatient.ageYears
     val ageMonths: Int get() = currentPatient.ageMonths
     val weightKg: Double? get() = if (currentPatient.weightKg > 0) currentPatient.weightKg else null
-    val gender: Gender get() = if (currentPatient.gender == PatientGender.MALE) {
-        Gender.MALE
-    } else if (currentPatient.gender == PatientGender.FEMALE) {
-        Gender.FEMALE
-    } else {
-        Gender.UNKNOWN
+    val gender: Gender get() = when (currentPatient.gender) {
+        PatientGender.MALE -> Gender.MALE
+        PatientGender.FEMALE -> Gender.FEMALE
+        PatientGender.UNKNOWN -> Gender.UNKNOWN
     }
 
     val totalAgeInMonths: Int get() = calculatedValues.totalAgeMonths

@@ -1,6 +1,4 @@
 // app/src/main/java/com/rdinfo2/ui/components/overlays/PatientDataOverlay.kt
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.rdinfo2.ui.components.overlays
 
 import androidx.compose.foundation.layout.*
@@ -9,348 +7,455 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.rdinfo2.data.patient.PatientDataManager
 import com.rdinfo2.data.patient.PatientGender
+import com.rdinfo2.data.patient.PatientData
+import com.rdinfo2.data.patient.CalculatedPatientValues
 
 /**
- * WORKING: Patientendaten-Overlay ohne Compile-Fehler
- * Funktioniert mit korrigiertem PatientDataManager
+ * FIXED: Overlay für Patientendaten-Eingabe
+ * Verwendet das neue PatientDataManager System ohne Enum-Konflikte
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PatientDataOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Local state mit korrekten Typen
-    var localAgeYears by remember { mutableStateOf(PatientDataManager.ageYears.toString()) }
-    var localAgeMonths by remember { mutableStateOf(PatientDataManager.ageMonths.toString()) }
-    var localWeight by remember { mutableStateOf(PatientDataManager.weightKg?.toString() ?: "") }
-    var localGender by remember { mutableStateOf(PatientDataManager.gender) }
+    // Verwende das neue PatientDataManager System
+    val currentPatient = PatientDataManager.currentPatient
+    val calculatedValues = PatientDataManager.calculatedValues
 
-    // Live-Updates anwenden
-    LaunchedEffect(localAgeYears, localAgeMonths) {
-        val years = localAgeYears.toIntOrNull() ?: 0
-        val months = localAgeMonths.toIntOrNull() ?: 0
-        if (years >= 0 && months >= 0) {
-            PatientDataManager.updateAge(years, months)
-        }
-    }
-
-    LaunchedEffect(localWeight) {
-        val weight = if (localWeight.isBlank()) null else localWeight.toDoubleOrNull()
-        PatientDataManager.updateWeight(weight)
-    }
-
-    LaunchedEffect(localGender) {
-        PatientDataManager.updateGender(localGender)
-    }
-
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = Color.Black.copy(alpha = 0.6f)
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(16.dp)),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Top
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
         ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.7f)
-                    .padding(16.dp),
-                shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            // Header with close button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(20.dp)
-                        .verticalScroll(rememberScrollState())
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Patientendaten",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Schließen"
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Quick-Patient Buttons
-                    Text(
-                        text = "Schnellauswahl",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
                     )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Säugling
-                        OutlinedButton(
-                            onClick = {
-                                PatientDataManager.setInfant()
-                                localAgeYears = PatientDataManager.ageYears.toString()
-                                localAgeMonths = PatientDataManager.ageMonths.toString()
-                                localWeight = PatientDataManager.weightKg?.toString() ?: ""
-                                localGender = PatientDataManager.gender
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Pets,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Säugling")
-                        }
-
-                        // Kind
-                        OutlinedButton(
-                            onClick = {
-                                PatientDataManager.setChild()
-                                localAgeYears = PatientDataManager.ageYears.toString()
-                                localAgeMonths = PatientDataManager.ageMonths.toString()
-                                localWeight = PatientDataManager.weightKg?.toString() ?: ""
-                                localGender = PatientDataManager.gender
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Face,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Kind")
-                        }
-
-                        // Erwachsener
-                        OutlinedButton(
-                            onClick = {
-                                PatientDataManager.setAdult()
-                                localAgeYears = PatientDataManager.ageYears.toString()
-                                localAgeMonths = PatientDataManager.ageMonths.toString()
-                                localWeight = PatientDataManager.weightKg?.toString() ?: ""
-                                localGender = PatientDataManager.gender
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Erwachsener")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    // Alter Eingabe
                     Text(
-                        text = "Alter",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        text = "Patientendaten",
+                        style = MaterialTheme.typography.titleLarge
                     )
+                }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Jahre
-                        OutlinedTextField(
-                            value = localAgeYears,
-                            onValueChange = { value ->
-                                if (value.isEmpty() || value.all { char -> char.isDigit() }) {
-                                    localAgeYears = value
-                                }
-                            },
-                            label = { Text("Jahre") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Schließen"
+                    )
+                }
+            }
 
-                        // Monate
-                        OutlinedTextField(
-                            value = localAgeMonths,
-                            onValueChange = { value ->
-                                if (value.isEmpty() || (value.all { char -> char.isDigit() } && (value.toIntOrNull() ?: 0) <= 11)) {
-                                    localAgeMonths = value
-                                }
-                            },
-                            label = { Text("Monate (0-11)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                    }
+            Spacer(modifier = Modifier.height(16.dp))
 
-                    Spacer(modifier = Modifier.height(24.dp))
+            // Patient data input form
+            PatientDataForm(
+                currentPatient = currentPatient,
+                calculatedValues = calculatedValues,
+                onUpdateAge = { years, months ->
+                    PatientDataManager.updateAge(years, months)
+                },
+                onUpdateWeight = { weight, isManual ->
+                    PatientDataManager.updateWeight(weight, isManual)
+                },
+                onUpdateGender = { gender ->
+                    PatientDataManager.updateGender(gender)
+                },
+                onUpdatePregnancy = { isPregnant, week ->
+                    PatientDataManager.updatePregnancy(isPregnant, week)
+                }
+            )
+        }
+    }
+}
 
-                    // Gewicht Eingabe
+@Composable
+fun PatientDataForm(
+    currentPatient: PatientData,
+    calculatedValues: CalculatedPatientValues,
+    onUpdateAge: (years: Int, months: Int) -> Unit,
+    onUpdateWeight: (weight: Double?, isManual: Boolean) -> Unit,
+    onUpdateGender: (gender: PatientGender) -> Unit,
+    onUpdatePregnancy: (isPregnant: Boolean, week: Int?) -> Unit
+) {
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .verticalScroll(scrollState)
+            .fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Age Section
+        AgeSection(
+            currentYears = currentPatient.ageYears,
+            currentMonths = currentPatient.ageMonths,
+            onAgeChanged = onUpdateAge
+        )
+
+        // Weight Section
+        WeightSection(
+            currentWeight = currentPatient.weightKg,
+            estimatedWeight = calculatedValues.estimatedWeight,
+            isManualWeight = currentPatient.isManualWeight,
+            onWeightChanged = onUpdateWeight
+        )
+
+        // Gender Section
+        GenderSection(
+            currentGender = currentPatient.gender,
+            onGenderChanged = onUpdateGender
+        )
+
+        // Pregnancy Section (only for females)
+        if (currentPatient.gender == PatientGender.FEMALE) {
+            PregnancySection(
+                isPregnant = currentPatient.isPregnant ?: false,
+                gestationalWeek = currentPatient.weekOfPregnancy,
+                onPregnancyChanged = onUpdatePregnancy
+            )
+        }
+
+        // Summary Card
+        PatientSummaryCard(
+            patient = currentPatient,
+            calculatedValues = calculatedValues
+        )
+    }
+}
+
+@Composable
+fun AgeSection(
+    currentYears: Int,
+    currentMonths: Int,
+    onAgeChanged: (years: Int, months: Int) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Alter",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Years slider
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Gewicht",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        text = "Jahre: $currentYears",
+                        style = MaterialTheme.typography.bodyMedium
                     )
-
-                    OutlinedTextField(
-                        value = localWeight,
+                    Slider(
+                        value = currentYears.toFloat(),
                         onValueChange = { value ->
-                            if (value.isEmpty() || value.matches(Regex("^\\d*\\.?\\d*$"))) {
-                                localWeight = value
-                            }
+                            onAgeChanged(value.toInt(), currentMonths)
                         },
-                        label = { Text("Gewicht in kg (optional)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        supportingText = {
-                            if (localWeight.isEmpty()) {
-                                Text(
-                                    text = "Automatische Schätzung: ${String.format("%.1f", PatientDataManager.estimatedWeightKg)} kg",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        valueRange = 0f..120f,
+                        steps = 119
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Geschlecht Auswahl
+                // Months slider
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Geschlecht",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        text = "Monate: $currentMonths",
+                        style = MaterialTheme.typography.bodyMedium
                     )
+                    Slider(
+                        value = currentMonths.toFloat(),
+                        onValueChange = { value ->
+                            onAgeChanged(currentYears, value.toInt())
+                        },
+                        valueRange = 0f..11f,
+                        steps = 10
+                    )
+                }
+            }
+        }
+    }
+}
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            onClick = { localGender = PatientGender.MALE },
-                            label = { Text("Männlich") },
-                            selected = localGender == PatientGender.MALE,
-                            modifier = Modifier.weight(1f)
-                        )
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WeightSection(
+    currentWeight: Double,
+    estimatedWeight: Double,
+    isManualWeight: Boolean,
+    onWeightChanged: (weight: Double?, isManual: Boolean) -> Unit
+) {
+    var weightText by remember(currentWeight) {
+        mutableStateOf(if (isManualWeight && currentWeight > 0) currentWeight.toString() else "")
+    }
 
-                        FilterChip(
-                            onClick = { localGender = PatientGender.FEMALE },
-                            label = { Text("Weiblich") },
-                            selected = localGender == PatientGender.FEMALE,
-                            modifier = Modifier.weight(1f)
-                        )
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Gewicht",
+                style = MaterialTheme.typography.titleMedium
+            )
 
-                        FilterChip(
-                            onClick = { localGender = PatientGender.UNKNOWN },
-                            label = { Text("Unbekannt") },
-                            selected = localGender == PatientGender.UNKNOWN,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+            // Estimated weight display
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Geschätzt: ${String.format("%.1f", estimatedWeight)} kg",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    // Zusammenfassung
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text(
-                                text = "Aktuelle Einstellungen",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = PatientDataManager.getPatientSummary(),
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Text(
-                                text = "Klassifikation: ${PatientDataManager.getAgeClassification()}",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                if (isManualWeight) {
+                    TextButton(
+                        onClick = {
+                            onWeightChanged(null, false)
+                            weightText = ""
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Action Buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = {
-                                PatientDataManager.resetToDefaults()
-                                localAgeYears = PatientDataManager.ageYears.toString()
-                                localAgeMonths = PatientDataManager.ageMonths.toString()
-                                localWeight = PatientDataManager.weightKg?.toString() ?: ""
-                                localGender = PatientDataManager.gender
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Zurücksetzen")
-                        }
-
-                        Button(
-                            onClick = onDismiss,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Fertig")
-                        }
+                        Text("Schätzung verwenden")
                     }
                 }
+            }
+
+            // Manual weight input
+            OutlinedTextField(
+                value = weightText,
+                onValueChange = { newValue ->
+                    weightText = newValue
+                    val weight = newValue.toDoubleOrNull()
+                    if (weight != null && weight > 0) {
+                        onWeightChanged(weight, true)
+                    } else if (newValue.isEmpty()) {
+                        onWeightChanged(null, false)
+                    }
+                },
+                label = { Text("Manuelles Gewicht (kg)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("${String.format("%.1f", estimatedWeight)}") }
+            )
+
+            // Effective weight display
+            val effectiveWeight = if (isManualWeight && currentWeight > 0) currentWeight else estimatedWeight
+            Text(
+                text = "Verwendet: ${String.format("%.1f", effectiveWeight)} kg",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GenderSection(
+    currentGender: PatientGender,
+    onGenderChanged: (PatientGender) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Geschlecht",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PatientGender.values().forEach { gender ->
+                    FilterChip(
+                        selected = currentGender == gender,
+                        onClick = { onGenderChanged(gender) },
+                        label = {
+                            Text(when (gender) {
+                                PatientGender.MALE -> "Männlich"
+                                PatientGender.FEMALE -> "Weiblich"
+                                PatientGender.UNKNOWN -> "Unbekannt"
+                            })
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PregnancySection(
+    isPregnant: Boolean,
+    gestationalWeek: Int?,
+    onPregnancyChanged: (isPregnant: Boolean, week: Int?) -> Unit
+) {
+    var weekText by remember(gestationalWeek) {
+        mutableStateOf(gestationalWeek?.toString() ?: "")
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Schwangerschaft",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Switch(
+                    checked = isPregnant,
+                    onCheckedChange = { checked ->
+                        onPregnancyChanged(checked, if (checked) gestationalWeek else null)
+                    }
+                )
+            }
+
+            if (isPregnant) {
+                OutlinedTextField(
+                    value = weekText,
+                    onValueChange = { newValue ->
+                        weekText = newValue
+                        val week = newValue.toIntOrNull()
+                        if (week != null && week in 1..42) {
+                            onPregnancyChanged(true, week)
+                        }
+                    },
+                    label = { Text("Schwangerschaftswoche") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("z.B. 20") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PatientSummaryCard(
+    patient: PatientData,
+    calculatedValues: CalculatedPatientValues
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Zusammenfassung",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            val ageText = when {
+                patient.ageYears == 0 -> "${calculatedValues.totalAgeMonths} Monate"
+                patient.ageMonths == 0 -> "${patient.ageYears} Jahre"
+                else -> "${patient.ageYears} Jahre, ${patient.ageMonths} Monate"
+            }
+
+            val genderText = when (patient.gender) {
+                PatientGender.MALE -> "männlich"
+                PatientGender.FEMALE -> if (patient.isPregnant == true) {
+                    "weiblich, schwanger (${patient.weekOfPregnancy ?: "?"} SSW)"
+                } else "weiblich"
+                PatientGender.UNKNOWN -> "unbekannt"
+            }
+
+            val categoryText = when {
+                calculatedValues.isInfant -> "Säugling"
+                calculatedValues.isChild -> "Kind"
+                calculatedValues.isAdolescent -> "Jugendlicher"
+                calculatedValues.isGeriatric -> "Geriatrisch"
+                else -> "Erwachsener"
+            }
+
+            Text(
+                text = "$categoryText, $ageText, $genderText",
+                style = MaterialTheme.typography.bodyLarge
+            )
+
+            val weightSuffix = if (patient.isManualWeight) " (manuell)" else " (geschätzt)"
+            Text(
+                text = "Gewicht: ${String.format("%.1f", calculatedValues.effectiveWeight)} kg$weightSuffix",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            if (calculatedValues.riskFactors.isNotEmpty()) {
+                Text(
+                    text = "Risikofaktoren: ${calculatedValues.riskFactors.joinToString(", ") { it.name }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

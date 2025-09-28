@@ -7,16 +7,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rdinfo2.data.preferences.SettingsManager
 import com.rdinfo2.data.preferences.ThemeMode
@@ -75,12 +77,17 @@ fun MainContent(settingsManager: SettingsManager) {
 
             // Tab content
             when (currentTab) {
-                0 -> MedicationCalculatorScreenPlaceholder()
+                0 -> MedicationCalculatorScreen()
                 1 -> AlgorithmsScreen()
                 2 -> ReferenceValuesScreen()
                 3 -> SpecialReferencesScreen()
             }
         }
+
+        // Overlay-System für Wischgesten
+        com.rdinfo2.ui.components.overlay.GestureOverlaySystem(
+            modifier = Modifier.fillMaxSize()
+        )
 
         // Main menu dropdown
         if (showMenu) {
@@ -191,18 +198,23 @@ fun MainMenuDropdown(
 }
 
 // =====================================================
-// PLACEHOLDER SCREENS - Diese werden schrittweise ersetzt
+// FUNKTIONALER MEDIKAMENTENRECHNER - Keine externen Abhängigkeiten
 // =====================================================
 
-// PLACEHOLDER - wird durch echten MedicationCalculatorScreen ersetzt
-// Diese Version ist FUNKTIONAL - nicht nur Text!
 @Composable
-fun MedicationCalculatorScreenPlaceholder() {
-    val patientManager = remember { PatientDataManager.getInstance() }
-    val currentPatient by patientManager.currentPatient.collectAsStateWithLifecycle()
-
-    var selectedMedication by remember { mutableStateOf("Adrenalin") }
+fun MedicationCalculatorScreen() {
+    // Einfacher lokaler State - keine komplexen Manager
+    var patientAgeYears by remember { mutableIntStateOf(35) }
+    var patientAgeMonths by remember { mutableIntStateOf(0) }
+    var patientWeight by remember { mutableDoubleStateOf(0.0) } // 0 = automatisch schätzen
     var showPatientEdit by remember { mutableStateOf(false) }
+    var selectedMedication by remember { mutableStateOf("Adrenalin") }
+
+    // Gewichtsschätzung
+    val estimatedWeight = when {
+        patientWeight > 0 -> patientWeight // Manuelles Gewicht
+        else -> estimateWeight(patientAgeYears, patientAgeMonths) // Automatisch
+    }
 
     Column(
         modifier = Modifier
@@ -222,11 +234,11 @@ fun MedicationCalculatorScreenPlaceholder() {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "🚀 RD-Info2 - Funktionaler Medikamentenrechner",
+                    text = "🚀 Funktionaler Medikamentenrechner",
                     style = MaterialTheme.typography.titleLarge
                 )
                 Text(
-                    text = "Diese Version ist FUNKTIONAL - du kannst echte Berechnungen durchführen!",
+                    text = "Klicke auf Buttons für echte Dosierungsberechnungen!",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -240,7 +252,8 @@ fun MedicationCalculatorScreenPlaceholder() {
             )
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -251,48 +264,68 @@ fun MedicationCalculatorScreenPlaceholder() {
                         text = "Patientendaten",
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Button(
-                        onClick = { showPatientEdit = true }
-                    ) {
+                    Button(onClick = { showPatientEdit = true }) {
                         Text("Bearbeiten")
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // Aktuelle Patientendaten
+                val formattedAge = if (patientAgeYears == 0 && patientAgeMonths > 0) {
+                    "$patientAgeMonths Monate"
+                } else if (patientAgeMonths == 0) {
+                    "$patientAgeYears Jahre"
+                } else {
+                    "$patientAgeYears J., $patientAgeMonths M."
+                }
 
-                Text("Alter: ${currentPatient.getFormattedAge()}")
-                Text("Gewicht: ${currentPatient.getFormattedWeight()}")
-                Text("Kategorie: ${currentPatient.ageCategory}")
+                val formattedWeight = if (patientWeight > 0) {
+                    "${String.format("%.1f", patientWeight)} kg"
+                } else {
+                    "${String.format("%.1f", estimatedWeight)} kg (geschätzt)"
+                }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Text("Alter: $formattedAge")
+                Text("Gewicht: $formattedWeight")
 
                 // Quick-Patient Buttons
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
-                        onClick = { patientManager.setQuickPatient("säugling") },
+                        onClick = {
+                            patientAgeYears = 0
+                            patientAgeMonths = 6
+                            patientWeight = 0.0
+                        },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Säugling")
+                        Text("Säugling", fontSize = 12.sp)
                     }
                     Button(
-                        onClick = { patientManager.setQuickPatient("kind") },
+                        onClick = {
+                            patientAgeYears = 8
+                            patientAgeMonths = 0
+                            patientWeight = 0.0
+                        },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Kind")
+                        Text("Kind", fontSize = 12.sp)
                     }
                     Button(
-                        onClick = { patientManager.setQuickPatient("erwachsener") },
+                        onClick = {
+                            patientAgeYears = 35
+                            patientAgeMonths = 0
+                            patientWeight = 0.0
+                        },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Erwachsener")
+                        Text("Erwachsener", fontSize = 12.sp)
                     }
                 }
             }
         }
 
-        // Medikamenten-Rechner Card - FUNKTIONAL
+        // Medikamenten-Rechner - FUNKTIONAL
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -308,23 +341,24 @@ fun MedicationCalculatorScreenPlaceholder() {
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                val weight = currentPatient.getEffectiveWeight()
-                val dose = when {
-                    currentPatient.ageYears < 1 -> 0.01 * weight
-                    currentPatient.ageYears < 12 -> 0.01 * weight
+                // Adrenalin Berechnung
+                val adrenalinDose = when {
+                    patientAgeYears < 1 -> 0.01 * estimatedWeight
+                    patientAgeYears < 12 -> 0.01 * estimatedWeight
                     else -> 1.0
                 }
 
                 Text(
-                    text = "Berechnete Dosis: ${String.format("%.2f", dose)} mg",
+                    text = "Dosis: ${String.format("%.2f", adrenalinDose)} mg",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
 
-                Text("Volumen: ${String.format("%.1f", dose)} ml (1:1000)")
+                Text("Volumen: ${String.format("%.1f", adrenalinDose)} ml (1:1000)")
                 Text("Verabreichung: i.v./i.o. unverdünnt")
 
-                if (dose > 5.0) {
+                // Warnung bei hoher Dosis
+                if (adrenalinDose > 5.0) {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
@@ -345,10 +379,10 @@ fun MedicationCalculatorScreenPlaceholder() {
                     Button(
                         onClick = {
                             val atropinDose = when {
-                                currentPatient.ageYears < 12 -> (0.02 * weight).coerceAtLeast(0.1).coerceAtMost(1.0)
+                                patientAgeYears < 12 -> (0.02 * estimatedWeight).coerceAtLeast(0.1).coerceAtMost(1.0)
                                 else -> 0.5
                             }
-                            selectedMedication = "Atropin: ${String.format("%.2f", atropinDose)} mg"
+                            selectedMedication = "Atropin: ${String.format("%.2f", atropinDose)} mg i.v."
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -357,11 +391,11 @@ fun MedicationCalculatorScreenPlaceholder() {
                     Button(
                         onClick = {
                             val glucoseDose = when {
-                                currentPatient.ageYears < 1 -> 2.0 * weight
-                                currentPatient.ageYears < 12 -> 1.0 * weight
+                                patientAgeYears < 1 -> 2.0 * estimatedWeight
+                                patientAgeYears < 12 -> 1.0 * estimatedWeight
                                 else -> 50.0
                             }
-                            selectedMedication = "Glucose 40%: ${String.format("%.0f", glucoseDose)} ml"
+                            selectedMedication = "Glucose 40%: ${String.format("%.0f", glucoseDose)} ml i.v."
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -369,12 +403,25 @@ fun MedicationCalculatorScreenPlaceholder() {
                     }
                 }
 
+                // Anzeige anderer Medikamente
                 if (selectedMedication != "Adrenalin") {
-                    Text(
-                        selectedMedication,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                "Weitere Berechnung:",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Text(
+                                selectedMedication,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -382,33 +429,35 @@ fun MedicationCalculatorScreenPlaceholder() {
 
     // Patient Edit Dialog
     if (showPatientEdit) {
-        var ageYears by remember { mutableStateOf(currentPatient.ageYears.toString()) }
-        var ageMonths by remember { mutableStateOf(currentPatient.ageMonths.toString()) }
-        var weight by remember { mutableStateOf(if (currentPatient.isManualWeight) currentPatient.weightKg.toString() else "") }
+        var tempAgeYears by remember { mutableStateOf(patientAgeYears.toString()) }
+        var tempAgeMonths by remember { mutableStateOf(patientAgeMonths.toString()) }
+        var tempWeight by remember { mutableStateOf(if (patientWeight > 0) patientWeight.toString() else "") }
 
         AlertDialog(
             onDismissRequest = { showPatientEdit = false },
-            title = { Text("Patientendaten") },
+            title = { Text("Patientendaten bearbeiten") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     OutlinedTextField(
-                        value = ageYears,
-                        onValueChange = { ageYears = it },
+                        value = tempAgeYears,
+                        onValueChange = { tempAgeYears = it },
                         label = { Text("Jahre") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedTextField(
-                        value = ageMonths,
-                        onValueChange = { ageMonths = it },
+                        value = tempAgeMonths,
+                        onValueChange = { tempAgeMonths = it },
                         label = { Text("Monate (0-11)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
                     OutlinedTextField(
-                        value = weight,
-                        onValueChange = { weight = it },
+                        value = tempWeight,
+                        onValueChange = { tempWeight = it },
                         label = { Text("Gewicht (kg, optional)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        supportingText = { Text("Leer = automatische Schätzung") }
+                        supportingText = { Text("Leer lassen für automatische Schätzung") }
                     )
                 }
             },
@@ -416,19 +465,9 @@ fun MedicationCalculatorScreenPlaceholder() {
                 TextButton(
                     onClick = {
                         try {
-                            val years = ageYears.toIntOrNull() ?: 0
-                            val months = ageMonths.toIntOrNull() ?: 0
-                            val weightValue = weight.toDoubleOrNull()
-
-                            if (weightValue != null && weightValue > 0) {
-                                patientManager.updatePatient(
-                                    com.rdinfo2.data.patient.PatientDataFactory.createWithWeight(years, months, weightValue)
-                                )
-                            } else {
-                                patientManager.updatePatient(
-                                    com.rdinfo2.data.patient.PatientDataFactory.create(years, months)
-                                )
-                            }
+                            patientAgeYears = tempAgeYears.toIntOrNull() ?: 0
+                            patientAgeMonths = tempAgeMonths.toIntOrNull() ?: 0
+                            patientWeight = tempWeight.toDoubleOrNull() ?: 0.0
                             showPatientEdit = false
                         } catch (e: Exception) {
                             // Handle error
@@ -446,6 +485,24 @@ fun MedicationCalculatorScreenPlaceholder() {
         )
     }
 }
+
+// Gewichtsschätzung nach medizinischen Formeln
+fun estimateWeight(years: Int, months: Int): Double {
+    val totalMonths = years * 12 + months
+
+    return when {
+        totalMonths == 0 -> 3.5
+        totalMonths <= 12 -> 3.5 + (totalMonths * 0.5)
+        years in 1..5 -> 2.0 * years + 8.0
+        years in 6..12 -> 3.0 * years + 7.0
+        years in 13..17 -> 50.0 + (years - 13) * 5.0
+        else -> 70.0
+    }
+}
+
+// =====================================================
+// PLACEHOLDER SCREENS - Zeigen Roadmap
+// =====================================================
 
 @Composable
 fun AlgorithmsScreen() {
@@ -512,7 +569,7 @@ fun ReferenceValuesScreen() {
                 )
                 Text(
                     text = "Altersabhängige Vitalparameter und Referenzwerte. " +
-                            "Benötigt PatientData für dynamische Berechnung.",
+                            "Integration mit dem Medikamentenrechner geplant.",
                     style = MaterialTheme.typography.bodyMedium
                 )
 

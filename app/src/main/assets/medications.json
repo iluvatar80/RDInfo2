@@ -1,0 +1,822 @@
+{
+  "version": "2.0",
+  "source": "Hamburger Rettungsdienst-Handbuch - Migriert aus alter JSON",
+  "lastUpdated": "2025-09-28",
+  "medications": [
+    {
+      "id": "acetylsalicylsaeure",
+      "name": "Acetylsalicylsäure",
+      "category": "CARDIOVASCULAR",
+      "indications": [
+        {
+          "name": "Akutes Koronarsyndrom",
+          "route": "i.v.",
+          "preparation": "250mg mit 5ml Aqua auflösen",
+          "dosageRules": [
+            {
+              "ageGroup": "ADOLESCENT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 250.0
+              },
+              "unit": "mg",
+              "volume": "5 ml (gelöst in Aqua)"
+            },
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 250.0
+              },
+              "unit": "mg",
+              "volume": "5 ml (gelöst in Aqua)"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Magenbeschwerden",
+        "Blutungen (z.B. Magen-Darm-/intrakraniell)",
+        "Überempfindlichkeitsreaktionen (Bronchospasmus, Hautreaktionen)",
+        "Reye-Syndrom bei Kindern"
+      ],
+      "contraindications": [
+        "Spätschwangerschaft (ab 28.SSW)",
+        "Kinder < 12.LJ",
+        "Erstmalige Einnahme bei Asthma bronchiale",
+        "Einnahme von Antikoagulantien, außer ASS 100mg",
+        "Blutungsneigung/akutes Trauma",
+        "Akute Aortendissektion"
+      ],
+      "notes": "Hemmung der Thrombozytenaggregation"
+    },
+    {
+      "id": "adrenalin",
+      "name": "Adrenalin",
+      "genericName": "Epinephrin",
+      "category": "CARDIOVASCULAR",
+      "indications": [
+        {
+          "name": "Reanimation",
+          "route": "i.v.",
+          "preparation": "1:10 verdünnt mit NaCl 0,9%",
+          "dosageRules": [
+            {
+              "ageGroup": "CHILD",
+              "calculation": {
+                "type": "PER_KG",
+                "value": 0.01
+              },
+              "unit": "mg",
+              "volume": "entsprechend ml (1:10 verdünnt)",
+              "note": "< 12J.: 0,01mg/kg KG i.v. nach Schema"
+            },
+            {
+              "ageGroup": "ADOLESCENT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 1.0
+              },
+              "unit": "mg",
+              "volume": "10 ml (1:10 verdünnt)",
+              "note": "≥ 12J.: 1mg i.v. nach Schema"
+            },
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 1.0
+              },
+              "unit": "mg",
+              "volume": "10 ml (1:10 verdünnt)"
+            }
+          ]
+        },
+        {
+          "name": "Anaphylaxie",
+          "route": "i.m.",
+          "preparation": "unverdünnt in seitlichen Oberschenkel",
+          "dosageRules": [
+            {
+              "ageGroup": "CHILD",
+              "calculation": {
+                "type": "FIXED",
+                "value": 0.15
+              },
+              "unit": "mg",
+              "volume": "0.15 ml",
+              "note": "<6J.: ggf. Repetition nach 5-10min"
+            },
+            {
+              "ageGroup": "CHILD",
+              "calculation": {
+                "type": "FIXED",
+                "value": 0.3
+              },
+              "unit": "mg",
+              "volume": "0.3 ml",
+              "note": "6.-11J.: ggf. Repetition nach 5-10min"
+            },
+            {
+              "ageGroup": "ADOLESCENT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 0.5
+              },
+              "unit": "mg",
+              "volume": "0.5 ml",
+              "note": ">11 J.: ggf. Repetition nach 5-10min"
+            },
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 0.5
+              },
+              "unit": "mg",
+              "volume": "0.5 ml"
+            }
+          ]
+        },
+        {
+          "name": "Schwellung der oberen Atemwege",
+          "route": "p.i.",
+          "preparation": "4mg pur vernebeln",
+          "dosageRules": [
+            {
+              "ageGroup": "ALL_AGES",
+              "calculation": {
+                "type": "FIXED",
+                "value": 4.0
+              },
+              "unit": "mg",
+              "note": "Flow: 8l O2, Abbruchkriterien bei Tachykardie >140/min, BD syst.>160"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Tachykardie, Herzrhythmusstörungen (bis Kammerflimmern)",
+        "AP-Beschwerden, Tremor, Mydriasis, Hypertonie, Hyperglykämie",
+        "In der Reanimation keine relevanten Nebenwirkungen"
+      ],
+      "contraindications": [
+        "bei Notfallindikationen keine absoluten Kontraindikationen"
+      ],
+      "notes": "Vasokonstriktion (α1), Steigerung von Herzkraft und Frequenz (β1), Bronchodilatation (β2), Hemmung der Histaminfreisetzung"
+    },
+    {
+      "id": "amiodaron",
+      "name": "Amiodaron",
+      "category": "CARDIOVASCULAR",
+      "indications": [
+        {
+          "name": "Defibrillationsresistentes Kammerflimmern",
+          "route": "i.v.",
+          "preparation": "langsam injizieren",
+          "dosageRules": [
+            {
+              "ageGroup": "CHILD",
+              "calculation": {
+                "type": "PER_KG",
+                "value": 5.0,
+                "maxDose": 300.0
+              },
+              "unit": "mg",
+              "note": "nach 3.Schock"
+            },
+            {
+              "ageGroup": "ADOLESCENT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 300.0
+              },
+              "unit": "mg",
+              "note": "nach 3.Schock, ggf. Repetition: 150mg nach 5.Schock"
+            },
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 300.0
+              },
+              "unit": "mg",
+              "note": "nach 3.Schock, ggf. Repetition: 150mg nach 5.Schock"
+            }
+          ],
+          "maxDose": {
+            "amount": 450.0,
+            "unit": "mg",
+            "timeframe": "pro Einsatz"
+          }
+        },
+        {
+          "name": "Ventrikuläre Tachykardie",
+          "route": "i.v.",
+          "preparation": "150mg als Kurzinfusion in 250ml G5%",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 150.0
+              },
+              "unit": "mg",
+              "volume": "250 ml G5%",
+              "note": "VT mit Puls: langsame Kurzinfusion"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Hypotonie möglich",
+        "QT-Verlängerung",
+        "Nicht mit anderen Antiarrhythmika kombinieren"
+      ],
+      "contraindications": [
+        "Glaukom (relative Kontraindikation)",
+        "Schwangerschaft, Stillzeit (relative)"
+      ],
+      "notes": "Antiarrhythmikum - Blockade verschiedener Ionenkanäle"
+    },
+    {
+      "id": "atropin",
+      "name": "Atropin",
+      "category": "CARDIOVASCULAR",
+      "indications": [
+        {
+          "name": "Symptomatische Bradykardie",
+          "route": "i.v.",
+          "preparation": "langsam injizieren",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 1.0
+              },
+              "unit": "mg",
+              "note": "ggf. Wiederholung nach 5min"
+            }
+          ],
+          "maxDose": {
+            "amount": 3.0,
+            "unit": "mg",
+            "timeframe": "pro Einsatz"
+          }
+        },
+        {
+          "name": "Parasympathomimetikaintoxikation",
+          "route": "i.v.",
+          "preparation": "nach Wirkung titrieren",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 2.0
+              },
+              "unit": "mg",
+              "note": "initial, cave: Antidot-Ampullen höher konzentriert (1ml=10mg)"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Tachykardie, Pupillenerweiterung (→Sehstörungen)",
+        "Mundtrockenheit, Schweißdrüsenhemmung (Atropinfieber)",
+        "evtl. Therapieversagen bei höhergradigem AV-Block"
+      ],
+      "contraindications": [
+        "Glaukom (relative)",
+        "Schwangerschaft, Stillzeit (relative)"
+      ],
+      "notes": "Parasympatholytikum - Steigerung der Herzfrequenz"
+    },
+    {
+      "id": "diazepam",
+      "name": "Diazepam",
+      "category": "NEUROLOGICAL",
+      "indications": [
+        {
+          "name": "Cerebraler Krampfanfall",
+          "route": "i.v.",
+          "preparation": "langsam über 5min",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 5.0
+              },
+              "unit": "mg",
+              "note": "ggf.1 x wiederholen, Dosishalbierung bei Senioren"
+            }
+          ]
+        },
+        {
+          "name": "Cerebraler Krampfanfall",
+          "route": "i.m.",
+          "preparation": "nur wenn i.v. nicht möglich",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 5.0
+              },
+              "unit": "mg",
+              "note": "nur wenn i.v. nicht möglich"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Atemdepression, Blutdruckabfall",
+        "Schwindel, paradoxe Reaktion mit Unruhe",
+        "anterograde Amnesie",
+        "lange Halbwertzeit (24-100h)!"
+      ],
+      "contraindications": [
+        "schwere Alkohol-/Medikamentenintoxikation",
+        "Unmöglichkeit der Beatmung",
+        "Kinder < 6 Monate",
+        "Myasthenia gravis"
+      ],
+      "notes": "Benzodiazepin - zentral sedierend, antikonvulsiv, anxiolytisch"
+    },
+    {
+      "id": "esketamin",
+      "name": "Esketamin",
+      "category": "ANALGESIC",
+      "indications": [
+        {
+          "name": "Schmerzzustände",
+          "route": "i.v.",
+          "preparation": "langsam injizieren",
+          "dosageRules": [
+            {
+              "ageGroup": "ALL_AGES",
+              "calculation": {
+                "type": "PER_KG",
+                "value": 0.1
+              },
+              "unit": "mg",
+              "note": "sinnvoll runden: <50kg: 5mg, >50kg: 10mg"
+            }
+          ],
+          "maxDose": {
+            "amount": 25.0,
+            "unit": "mg",
+            "timeframe": "pro Einsatz durch NotSan"
+          }
+        },
+        {
+          "name": "Schmerzzustände",
+          "route": "i.m.",
+          "preparation": "intramuskulär",
+          "dosageRules": [
+            {
+              "ageGroup": "ALL_AGES",
+              "calculation": {
+                "type": "PER_KG",
+                "value": 0.25
+              },
+              "unit": "mg",
+              "note": "ca. 1/4 des Körpergewichts"
+            }
+          ],
+          "maxDose": {
+            "amount": 25.0,
+            "unit": "mg",
+            "timeframe": "pro Einsatz durch NotSan"
+          }
+        }
+      ],
+      "warnings": [
+        "Zunahme des Sauerstoffverbrauchs",
+        "Hirndrucksteigerung/Augeninnendrucksteigerung (lt. Fachinformation)",
+        "Albträume (→ Kombination mit Midazolam)",
+        "Vermehrte Speichelsekretion, Nystagmus"
+      ],
+      "contraindications": [
+        "GCS<14",
+        "Akutes Koronarsyndrom",
+        "Eklampsie, drohende Geburt",
+        "BDsyst. > 180mmHg",
+        "Isolierte Augenverletzungen",
+        "Unmöglichkeit der Beatmung"
+      ],
+      "notes": "Analgesie und Sedierung bei erhaltenen Schutzreflexen, Herz-Kreislauf-Stimulation, Bronchodilatation"
+    },
+    {
+      "id": "fentanyl",
+      "name": "Fentanyl",
+      "category": "ANALGESIC",
+      "indications": [
+        {
+          "name": "Schwere Schmerzzustände",
+          "route": "i.v.",
+          "preparation": "langsam injizieren",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 0.05
+              },
+              "unit": "mg",
+              "note": "ggf. Wiederholung nach 2min"
+            }
+          ],
+          "maxDose": {
+            "amount": 0.1,
+            "unit": "mg",
+            "timeframe": "pro Einsatz durch NotSan"
+          }
+        }
+      ],
+      "warnings": [
+        "Ausgeprägte Atemdepression bis Apnoe",
+        "Brustkorbstarre bei schneller Gabe",
+        "Gefäßerweiterung mit Blutdruckabfall",
+        "Bewusstseinstrübung",
+        "BtMG-pflichtige Dokumentation!"
+      ],
+      "contraindications": [
+        "GCS<14",
+        "akute kardiopulmonale Beeinträchtigung",
+        "Schock",
+        "Kolikartige Schmerzen",
+        "Vorherige Gabe von Esketamin"
+      ],
+      "notes": "Opiat (BtMG§13) - zentrale Hemmung der Schmerzempfindung, Antagonisierung durch Naloxon"
+    },
+    {
+      "id": "furosemid",
+      "name": "Furosemid",
+      "category": "CARDIOVASCULAR",
+      "indications": [
+        {
+          "name": "Akute Linksherzinsuffizienz",
+          "route": "i.v.",
+          "preparation": "langsam über 5min",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 20.0
+              },
+              "unit": "mg",
+              "note": "ggf. 1x wiederholen, Dosishalbierung bei Niereninsuffizienz"
+            }
+          ],
+          "maxDose": {
+            "amount": 40.0,
+            "unit": "mg",
+            "timeframe": "pro Einsatz durch NotSan"
+          }
+        }
+      ],
+      "warnings": [
+        "Blutdruckabfall (v.a. bei zu schneller Injektion!)",
+        "Erhöhte Ausscheidung aller Elektrolyte (v.a. Kalium)",
+        "Thrombosegefahr durch Zunahme des Hämatokrit"
+      ],
+      "contraindications": [
+        "BDsyst. <120mmHg",
+        "Dialysepatient",
+        "Harnabflussbehinderung (relativ)",
+        "Schwere Kaliummangel (relativ)"
+      ],
+      "notes": "Diuretikum - Vorlastsenkung durch Volumenverlust → Entlastung des Herzens"
+    },
+    {
+      "id": "glucose_20",
+      "name": "Glucose 20%",
+      "category": "METABOLIC",
+      "indications": [
+        {
+          "name": "Symptomatische Hypoglykämie",
+          "route": "i.v.",
+          "preparation": "unter laufender Infusion",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 4000.0
+              },
+              "unit": "mg",
+              "volume": "20 ml G20%",
+              "note": "ggf. wiederholen bis Patient ansprechbar"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Venenreizend",
+        "Gewebsnekrosen bei Paravasat",
+        "Umverteilung nach 1-2h"
+      ],
+      "contraindications": [
+        "Unsichere Lage i.v.-Zugang",
+        "BZ ≥ 100mg/dl"
+      ],
+      "notes": "Erhöhung des Blutglukosespiegels mit sofortiger Wirkung"
+    },
+    {
+      "id": "heparin",
+      "name": "Heparin",
+      "category": "CARDIOVASCULAR",
+      "indications": [
+        {
+          "name": "Akutes Koronarsyndrom",
+          "route": "i.v.",
+          "preparation": "als Bolus",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 5000.0
+              },
+              "unit": "I.E.",
+              "volume": "0.5 ml"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Blutungen",
+        "Thrombozytenabfall (HIT)"
+      ],
+      "contraindications": [
+        "Einnahme von Antikoagulantien (außer ASS 100mg)",
+        "Blutungsneigung/akutes Trauma",
+        "Fehlen von ST-Hebungen im EKG",
+        "HIT (Heparininduzierte Thrombozytopenie)"
+      ],
+      "notes": "Hemmung der Blutgerinnung über Hemmung der Gerinnungsfaktoren"
+    },
+    {
+      "id": "midazolam",
+      "name": "Midazolam",
+      "category": "SEDATIVE",
+      "indications": [
+        {
+          "name": "Analgosedierung mit Esketamin",
+          "route": "i.v.",
+          "preparation": "langsam injizieren",
+          "dosageRules": [
+            {
+              "ageGroup": "CHILD",
+              "calculation": {
+                "type": "PER_KG",
+                "value": 0.01
+              },
+              "unit": "mg",
+              "note": "z.B. bei > 50kgKG: 1mg i.v."
+            },
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "PER_KG",
+                "value": 0.01
+              },
+              "unit": "mg",
+              "note": "Dosishalbierung bei Senioren/alkoholisierten Patienten"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Atemdepression, Blutdruckabfall",
+        "Schwindel, paradoxe Reaktion mit Unruhe",
+        "anterograde Amnesie",
+        "Verschiedene Ampullenkonzentrationen im Handel!"
+      ],
+      "contraindications": [
+        "schwere Alkohol-/Medikamentenintoxikation",
+        "GCS<14",
+        "Deutlich eingeschränkte Atemfunktion",
+        "Kinder < 6 Monate"
+      ],
+      "notes": "Benzodiazepin - zentral sedierend, antikonvulsiv, anxiolytisch"
+    },
+    {
+      "id": "naloxon",
+      "name": "Naloxon",
+      "category": "ANTIDOTE",
+      "indications": [
+        {
+          "name": "Opiatintoxikation mit Atemdepression",
+          "route": "i.v.",
+          "preparation": "0,4mg + 9ml NaCl 0,9% = 0,04mg/ml",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 0.08
+              },
+              "unit": "mg",
+              "volume": "2ml der Mischung",
+              "note": "alle 2min, bis max. 0,4mg"
+            }
+          ],
+          "maxDose": {
+            "amount": 0.4,
+            "unit": "mg",
+            "timeframe": "pro Einsatz"
+          }
+        },
+        {
+          "name": "Opiatintoxikation mit Atemdepression",
+          "route": "i.m.",
+          "preparation": "unverdünnt",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 0.4
+              },
+              "unit": "mg",
+              "note": "Alternative wenn i.v. nicht möglich"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Entzugssymptomatik, Schmerzen",
+        "Blutdruckanstieg, Tachykardie",
+        "Aggressives Verhalten nach Antagonisierung",
+        "Patient muss im Krankenhaus überwacht werden!"
+      ],
+      "contraindications": [
+        "Mischintoxikationen (relativ)"
+      ],
+      "notes": "Direkter Opioid-Antagonist - Verdrängung von Opiaten aus der Rezeptorbindung"
+    },
+    {
+      "id": "nitroglycerin",
+      "name": "Nitroglycerin",
+      "category": "CARDIOVASCULAR",
+      "indications": [
+        {
+          "name": "Akute Linksherzinsuffizienz",
+          "route": "s.l.",
+          "preparation": "sublingual",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 0.4
+              },
+              "unit": "Hub",
+              "note": "alle 5min, Ziel: Symptomfreiheit, BDsyst. um max. 20% senken"
+            }
+          ],
+          "maxDose": {
+            "amount": 3.0,
+            "unit": "Hub",
+            "timeframe": "pro Einsatz (1,2mg)"
+          }
+        }
+      ],
+      "warnings": [
+        "Blutdruckabfall, Tachykardie, Kopfschmerzen",
+        "Hat gemäß neuer Leitlinien seinen Stellenwert verloren"
+      ],
+      "contraindications": [
+        "BDsyst. < 120 mmHg",
+        "Rechtsventrikulärer Myokardinfarkt",
+        "Einnahme von PDE-Hemmern ≤ 48h",
+        "Aortenklappenstenose (relativ)"
+      ],
+      "notes": "Vorlastsenkung (95% venös), Nachlastsenkung (5% arteriell), Koronardilatation"
+    },
+    {
+      "id": "paracetamol",
+      "name": "Paracetamol",
+      "category": "ANALGESIC",
+      "indications": [
+        {
+          "name": "Schwere abdominelle Schmerzen",
+          "route": "i.v.",
+          "preparation": "über mehrere Minuten",
+          "dosageRules": [
+            {
+              "ageGroup": "CHILD",
+              "calculation": {
+                "type": "PER_KG",
+                "value": 15.0,
+                "maxDose": 1000.0
+              },
+              "unit": "mg",
+              "note": "10-50 kg KG, langsam i.v."
+            },
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 1000.0
+              },
+              "unit": "mg",
+              "note": "> 50Kg KG, keine Repetitionsdosis"
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Veränderungen des Blutbildes",
+        "Bronchospasmus (Analgetikaasthma)"
+      ],
+      "contraindications": [
+        "NRS < 4",
+        "Schwere Leberinsuffizienz",
+        "Paracetamol-Gabe in den letzten 6 Stunden",
+        "Kinder < 6 Jahre"
+      ],
+      "notes": "Schwache Analgesie, Fiebersenkung"
+    },
+    {
+      "id": "prednisolon",
+      "name": "Prednisolon",
+      "category": "OTHER",
+      "indications": [
+        {
+          "name": "Anaphylaxie",
+          "route": "i.v.",
+          "preparation": "250mg mit 5ml Aqua auflösen",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 250.0
+              },
+              "unit": "mg",
+              "volume": "5 ml",
+              "note": "langsam i.v."
+            }
+          ]
+        },
+        {
+          "name": "Obstruktion der unteren Atemwege",
+          "route": "i.v.",
+          "preparation": "100mg mit 5ml Aqua auflösen",
+          "dosageRules": [
+            {
+              "ageGroup": "ADULT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 100.0
+              },
+              "unit": "mg",
+              "volume": "5 ml",
+              "note": "langsam i.v."
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        "Flush bei schneller Injektion",
+        "Hyperglykämie",
+        "Infektionen im Verlauf"
+      ],
+      "contraindications": [
+        "Allergien auch auf Zusatzstoffe möglich"
+      ],
+      "notes": "Kortikosteroid - Entzündungshemmung, Immunsuppression, Regulation zahlreicher Stoffwechselvorgänge"
+    },
+    {
+      "id": "salbutamol",
+      "name": "Salbutamol",
+      "category": "RESPIRATORY",
+      "indications": [
+        {
+          "name": "Obstruktion der unteren Atemwege",
+          "route": "p.i.",
+          "preparation": "pur vernebeln + 8l Flow O2",
+          "dosageRules": [
+            {
+              "ageGroup": "CHILD",
+              "calculation": {
+                "type": "FIXED",
+                "value": 1.25
+              },
+              "unit": "mg",
+              "note": "4-11J, Abbruchkriterien bei Tachykardie >140/min"
+            },
+            {
+              "ageGroup": "ADOLESCENT",
+              "calculation": {
+                "type": "FIXED",
+                "value": 2.5
+              },
+              "unit": "mg",
+              "note": "> 11J,,

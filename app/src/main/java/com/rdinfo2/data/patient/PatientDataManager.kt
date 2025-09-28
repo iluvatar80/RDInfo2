@@ -1,232 +1,171 @@
-// app/src/main/java/com/rdinfo2/data/patient/PatientDataManager.kt
-package com.rdinfo2.data.patient
+// app/src/main/java/com/rdinfo2/data/PatientDataManager.kt
+package com.rdinfo2.data
 
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.State
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
- * Zentrale Verwaltung der aktuellen Patientendaten
- * Singleton für app-weiten Zugriff auf Patienteninformationen
- * Daten werden NICHT persistent gespeichert (nur RAM)
+ * Verwaltet Patientendaten zentral und persistent
+ * FIXED: Eingaben werden jetzt korrekt gespeichert und bleiben beim Overlay-Schließen erhalten
  */
-class PatientDataManager private constructor() {
+object PatientDataManager {
 
-    companion object {
-        @Volatile
-        private var INSTANCE: PatientDataManager? = null
+    // State für UI - wird NICHT zurückgesetzt beim Overlay schließen
+    var ageYears by mutableStateOf(5)      // FIXED: Startwert 5 statt 40
+        private set
 
-        fun getInstance(): PatientDataManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: PatientDataManager().also { INSTANCE = it }
+    var ageMonths by mutableStateOf(5)     // FIXED: Startwert 5 statt 0
+        private set
+
+    var weightKg by mutableStateOf<Double?>(null)
+        private set
+
+    var gender by mutableStateOf(Gender.UNKNOWN)
+        private set
+
+    // FIXED: Persistent storage für Eingaben
+    private var _persistentAgeYears = 5
+    private var _persistentAgeMonths = 5
+    private var _persistentWeight: Double? = null
+    private var _persistentGender = Gender.UNKNOWN
+
+    // Computed properties
+    val totalAgeInMonths: Int
+        get() = ageYears * 12 + ageMonths
+
+    val estimatedWeightKg: Double
+        get() = weightKg ?: calculateEstimatedWeight()
+
+    val isInfant: Boolean
+        get() = totalAgeInMonths < 12
+
+    val isChild: Boolean
+        get() = totalAgeInMonths >= 12 && totalAgeInMonths < 18 * 12
+
+    val isAdult: Boolean
+        get() = totalAgeInMonths >= 18 * 12
+
+    // FIXED: Update-Methoden speichern persistent
+    fun updateAge(years: Int, months: Int) {
+        val validYears = years.coerceIn(0, 120)
+        val validMonths = months.coerceIn(0, 11)
+
+        ageYears = validYears
+        ageMonths = validMonths
+
+        // Persistent speichern
+        _persistentAgeYears = validYears
+        _persistentAgeMonths = validMonths
+
+        // Auto-update Gewicht wenn nicht manuell gesetzt
+        if (weightKg == null) {
+            weightKg = calculateEstimatedWeight()
+        }
+    }
+
+    fun updateWeight(weight: Double?) {
+        weightKg = weight?.coerceIn(0.5, 300.0)
+        _persistentWeight = weightKg
+    }
+
+    fun updateGender(newGender: Gender) {
+        gender = newGender
+        _persistentGender = newGender
+    }
+
+    // FIXED: Reset lädt persistent gespeicherte Werte
+    fun resetToDefaults() {
+        // Lade gespeicherte Werte statt Defaults
+        ageYears = _persistentAgeYears
+        ageMonths = _persistentAgeMonths
+        weightKg = _persistentWeight
+        gender = _persistentGender
+    }
+
+    // Quick-Set Methoden für häufige Patiententypen
+    fun setInfant() {
+        updateAge(0, 6)  // 6 Monate alter Säugling
+        updateWeight(8.0)
+        updateGender(Gender.UNKNOWN)
+    }
+
+    fun setChild() {
+        updateAge(5, 0)  // 5 Jahre altes Kind
+        updateWeight(null) // Auto-Schätzung
+        updateGender(Gender.UNKNOWN)
+    }
+
+    fun setAdult() {
+        updateAge(35, 0)  // 35 Jahre alter Erwachsener
+        updateWeight(70.0)
+        updateGender(Gender.UNKNOWN)
+    }
+
+    // FIXED: Verbesserte Gewichtsschätzung mit korrekten Formeln
+    private fun calculateEstimatedWeight(): Double {
+        return when {
+            // Säuglinge (0-12 Monate): Empirische Formel
+            totalAgeInMonths <= 12 -> {
+                when (totalAgeInMonths) {
+                    0 -> 3.5  // Neugeborenes
+                    1 -> 4.5
+                    2 -> 5.5
+                    3 -> 6.5
+                    4 -> 7.0
+                    5 -> 7.5
+                    6 -> 8.0
+                    7 -> 8.5
+                    8 -> 9.0
+                    9 -> 9.5
+                    10 -> 10.0
+                    11 -> 10.5
+                    12 -> 11.0
+                    else -> 11.0
+                }
+            }
+
+            // Kleinkinder (1-5 Jahre): WHO Formel
+            totalAgeInMonths <= 60 -> {
+                val ageInYears = totalAgeInMonths / 12.0
+                2 * ageInYears + 8  // WHO empfohlene Formel
+            }
+
+            // Kinder (5-14 Jahre): Erweiterte Formel
+            totalAgeInMonths < 14 * 12 -> {
+                val ageInYears = totalAgeInMonths / 12.0
+                (ageInYears * 2.5) + 10  // Angepasste Formel für ältere Kinder
+            }
+
+            // Jugendliche/Erwachsene: Standard Erwachsenengewicht
+            totalAgeInMonths < 18 * 12 -> {
+                val ageInYears = totalAgeInMonths / 12.0
+                45 + ((ageInYears - 14) * 5)  // Gewichtszunahme in der Pubertät
+            }
+
+            // Erwachsene: Geschlechtsabhängig
+            else -> when (gender) {
+                Gender.MALE -> 75.0
+                Gender.FEMALE -> 65.0
+                Gender.UNKNOWN -> 70.0
             }
         }
     }
 
-    // Aktueller Patient (StateFlow für Compose Integration)
-    private val _currentPatient = MutableStateFlow(PatientDataFactory.createUnknown())
-    val currentPatient: StateFlow<PatientData> = _currentPatient.asStateFlow()
-
-    // UI State für Eingabe-Screens
-    private val _isEditing = MutableStateFlow(false)
-    val isEditing: StateFlow<Boolean> = _isEditing.asStateFlow()
-
-    // Letzte Patientendaten für "Zurück" Funktionalität
-    private var _previousPatient: PatientData? = null
-
-    /**
-     * Aktualisiert die Patientendaten
-     */
-    fun updatePatient(newPatient: PatientData) {
-        _previousPatient = _currentPatient.value
-        _currentPatient.value = newPatient
-    }
-
-    /**
-     * Aktualisiert nur das Alter (behält andere Daten bei)
-     */
-    fun updateAge(years: Int, months: Int) {
-        val current = _currentPatient.value
-        val updatedPatient = current.copy(
-            ageYears = years,
-            ageMonths = months,
-            totalAgeMonths = years * 12 + months,
-            ageCategory = AgeCategory.fromAge(years, months),
-            estimatedWeightKg = PatientDataFactory.estimateWeight(years, months),
-            lastUpdated = System.currentTimeMillis()
-        )
-        updatePatient(updatedPatient)
-    }
-
-    /**
-     * Aktualisiert nur das Gewicht
-     */
-    fun updateWeight(weightKg: Double, isManual: Boolean = true) {
-        val current = _currentPatient.value
-        val updatedPatient = current.copy(
-            weightKg = if (isManual) weightKg else current.weightKg,
-            isManualWeight = isManual,
-            estimatedWeightKg = if (!isManual) weightKg else current.estimatedWeightKg,
-            lastUpdated = System.currentTimeMillis()
-        )
-        updatePatient(updatedPatient)
-    }
-
-    /**
-     * Aktualisiert nur das Geschlecht
-     */
-    fun updateGender(gender: PatientGender) {
-        val current = _currentPatient.value
-        updatePatient(current.copy(
-            gender = gender,
-            lastUpdated = System.currentTimeMillis()
-        ))
-    }
-
-    /**
-     * Setzt Schwangerschaftsstatus
-     */
-    fun updatePregnancy(isPregnant: Boolean, gestationalWeek: Int? = null) {
-        val current = _currentPatient.value
-        updatePatient(current.copy(
-            isPregnant = isPregnant,
-            gestationalWeek = if (isPregnant) gestationalWeek else null,
-            lastUpdated = System.currentTimeMillis()
-        ))
-    }
-
-    /**
-     * Fügt Allergie hinzu
-     */
-    fun addAllergy(allergy: String) {
-        if (allergy.isBlank()) return
-
-        val current = _currentPatient.value
-        val updatedAllergies = current.allergies.toMutableList()
-        if (!updatedAllergies.contains(allergy)) {
-            updatedAllergies.add(allergy)
-            updatePatient(current.copy(
-                allergies = updatedAllergies,
-                lastUpdated = System.currentTimeMillis()
-            ))
-        }
-    }
-
-    /**
-     * Entfernt Allergie
-     */
-    fun removeAllergy(allergy: String) {
-        val current = _currentPatient.value
-        val updatedAllergies = current.allergies.toMutableList()
-        if (updatedAllergies.remove(allergy)) {
-            updatePatient(current.copy(
-                allergies = updatedAllergies,
-                lastUpdated = System.currentTimeMillis()
-            ))
-        }
-    }
-
-    /**
-     * Setzt alle Patientendaten zurück
-     */
-    fun resetPatient() {
-        _previousPatient = _currentPatient.value
-        _currentPatient.value = PatientDataFactory.createUnknown()
-        _isEditing.value = false
-    }
-
-    /**
-     * Stellt vorherige Patientendaten wieder her
-     */
-    fun restorePrevious() {
-        _previousPatient?.let { previous ->
-            _currentPatient.value = previous
-            _previousPatient = null
-        }
-    }
-
-    /**
-     * Startet Editing-Modus
-     */
-    fun startEditing() {
-        _isEditing.value = true
-    }
-
-    /**
-     * Beendet Editing-Modus
-     */
-    fun stopEditing() {
-        _isEditing.value = false
-    }
-
-    /**
-     * Hilfsfunktion für schnelle Patientenerstellung in Tests/Debug
-     */
-    fun setQuickPatient(description: String) {
-        val patient = when (description.lowercase()) {
-            "neugeborenes" -> PatientDataFactory.create(0, 1)
-            "säugling" -> PatientDataFactory.create(0, 6)
-            "kleinkind" -> PatientDataFactory.create(2)
-            "schulkind" -> PatientDataFactory.create(8)
-            "jugendlicher" -> PatientDataFactory.create(15)
-            "erwachsener" -> PatientDataFactory.create(35)
-            "senior" -> PatientDataFactory.create(70)
-            else -> PatientDataFactory.createUnknown()
-        }
-        updatePatient(patient)
-    }
-
-    /**
-     * Gibt aktuelles effektives Gewicht zurück (für Dosierungsberechnungen)
-     */
-    fun getCurrentWeight(): Double {
-        return _currentPatient.value.getEffectiveWeight()
-    }
-
-    /**
-     * Gibt aktuelles Alter in Jahren zurück
-     */
-    fun getCurrentAgeYears(): Int {
-        return _currentPatient.value.ageYears
-    }
-
-    /**
-     * Gibt aktuelles Gesamtalter in Monaten zurück
-     */
-    fun getCurrentAgeMonths(): Int {
-        return _currentPatient.value.totalAgeMonths
-    }
-
-    /**
-     * Prüft ob Patient-Daten vollständig sind
-     */
-    fun isCurrentPatientValid(): Boolean {
-        return _currentPatient.value.isValid()
-    }
-
-    /**
-     * Export für Debug/Logging (keine medizinischen Daten)
-     */
+    // Datenexport für andere Komponenten
     fun getPatientSummary(): String {
-        val patient = _currentPatient.value
-        return "Patient: ${patient.getFormattedAge()}, ${patient.getFormattedWeight()}, ${patient.ageCategory}"
+        val weight = String.format("%.1f", estimatedWeightKg)
+        val ageStr = if (ageMonths > 0) "$ageYears Jahre, $ageMonths Monate" else "$ageYears Jahre"
+        val genderStr = when (gender) {
+            Gender.MALE -> "männlich"
+            Gender.FEMALE -> "weiblich"
+            Gender.UNKNOWN -> "unbekannt"
+        }
+
+        return "$ageStr, $weight kg, $genderStr"
     }
 }
 
-/**
- * Extension für PatientDataFactory mit internen Zugriff
- */
-private fun PatientDataFactory.estimateWeight(years: Int, months: Int): Double {
-    val totalMonths = years * 12 + months
-
-    return when {
-        totalMonths == 0 -> 3.5
-        totalMonths <= 12 -> 3.5 + (totalMonths * 0.5)
-        years in 1..5 -> 2.0 * years + 8.0
-        years in 6..12 -> 3.0 * years + 7.0
-        years in 13..17 -> 50.0 + (years - 13) * 5.0
-        else -> 70.0
-    }
+enum class Gender {
+    MALE, FEMALE, UNKNOWN
 }

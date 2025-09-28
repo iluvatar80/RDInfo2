@@ -1,379 +1,187 @@
 // app/src/main/java/com/rdinfo2/ui/components/overlay/GestureOverlaySystem.kt
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.rdinfo2.ui.components.overlay
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rdinfo2.data.patient.PatientDataManager
-import com.rdinfo2.data.patient.PatientGender
-import com.rdinfo2.data.repository.MedicationRepository
-import kotlin.math.abs
+import com.rdinfo2.data.PatientDataManager  // FIXED: Korrekte Import-Pfade
+import com.rdinfo2.ui.components.overlays.PatientDataOverlay
 
 /**
- * Haupt-Overlay-System mit Gesture-Erkennung
- * Ersetzt die alte GestureOverlayContainer
+ * FIXED: Gesture-basiertes Overlay-System
+ * Verwaltet Overlays durch Wischgesten ohne Compile-Fehler
  */
+
+enum class OverlayState {
+    HIDDEN,
+    PATIENT_DATA,  // Oben nach unten wischen
+    SAMPLER,       // Links nach rechts wischen (später)
+    XABCDE         // Rechts nach links wischen (später)
+}
+
 @Composable
 fun GestureOverlaySystem(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
 ) {
-    var overlayState by remember { mutableStateOf(OverlayState.NONE) }
-    var dragOffset by remember { mutableStateOf(0f) }
+    var overlayState by remember { mutableStateOf(OverlayState.HIDDEN) }
+    var dragProgress by remember { mutableStateOf(0f) }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragEnd = {
-                        // Overlay öffnen wenn weit genug gezogen
-                        if (abs(dragOffset) > 200) {
-                            overlayState = when {
-                                dragOffset > 0 -> OverlayState.PATIENT_DATA
-                                // Später: dragOffset < -200 -> andere Overlays
-                                else -> OverlayState.NONE
+    val density = LocalDensity.current
+
+    Box(modifier = modifier.fillMaxSize()) {
+        // Hauptinhalt
+        content()
+
+        // Gesture Detection Layer
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { _ ->
+                            // Reset progress
+                            dragProgress = 0f
+                        },
+                        onDragEnd = {
+                            // Entscheiden ob Overlay öffnen oder schließen
+                            if (dragProgress > 0.3f) {
+                                // Overlay öffnen
+                                overlayState = OverlayState.PATIENT_DATA
+                            } else {
+                                // Overlay schließen
+                                overlayState = OverlayState.HIDDEN
                             }
+                            dragProgress = 0f
                         }
-                        dragOffset = 0f
-                    }
-                ) { _, dragAmount ->
-                    // Nur vertikale Gesten für jetzt (von oben nach unten)
-                    if (overlayState == OverlayState.NONE) {
-                        dragOffset += dragAmount.y
-                        // Nur positive Werte (nach unten) zulassen
-                        dragOffset = dragOffset.coerceAtLeast(0f)
+                    ) { change, _ ->
+                        // Nur vertikale Drags von oben nach unten für Patient Data
+                        if (change.position.y > 100) { // Mindestabstand vom oberen Rand
+                            val newProgress = (change.position.y / size.height.toFloat()).coerceIn(0f, 1f)
+                            dragProgress = newProgress
+                        }
                     }
                 }
-            }
-    ) {
-        // Drag-Indikator (zeigt Fortschritt beim Ziehen)
-        if (dragOffset > 0 && overlayState == OverlayState.NONE) {
-            DragIndicator(
-                progress = (dragOffset / 200f).coerceAtMost(1f),
+        )
+
+        // Drag Indicator (zeigt Fortschritt)
+        if (dragProgress > 0f && overlayState == OverlayState.HIDDEN) {
+            Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
+                    .padding(top = 8.dp)
+                    .width(60.dp)
+                    .height(4.dp)
+                    .background(
+                        Color.Gray.copy(alpha = dragProgress),
+                        RoundedCornerShape(2.dp)
+                    )
             )
         }
 
-        // Overlay anzeigen
-        AnimatedOverlay(
-            overlayState = overlayState,
-            onDismiss = { overlayState = OverlayState.NONE }
-        )
-    }
-}
-
-@Composable
-private fun DragIndicator(
-    progress: Float,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .alpha(progress)
-            .size(width = 60.dp, height = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = progress)
-        ),
-        shape = RoundedCornerShape(2.dp)
-    ) {}
-}
-
-@OptIn(ExperimentalAnimationApi::class)
-@Composable
-private fun AnimatedOverlay(
-    overlayState: OverlayState,
-    onDismiss: () -> Unit
-) {
-    AnimatedVisibility(
-        visible = overlayState != OverlayState.NONE,
-        enter = slideInVertically(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            ),
-            initialOffsetY = { -it }
-        ) + fadeIn(),
-        exit = slideOutVertically(
-            targetOffsetY = { -it }
-        ) + fadeOut()
-    ) {
-        when (overlayState) {
-            OverlayState.PATIENT_DATA -> PatientDataOverlay(onDismiss = onDismiss)
-            OverlayState.SAMPLER -> { /* Später implementiert */ }
-            OverlayState.XABCDE -> { /* Später implementiert */ }
-            OverlayState.NONE -> { /* Nichts anzeigen */ }
+        // Overlay Content mit Animation
+        AnimatedVisibility(
+            visible = overlayState == OverlayState.PATIENT_DATA,
+            enter = slideInVertically(
+                initialOffsetY = { -it },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            ) + fadeIn(),
+            exit = slideOutVertically(
+                targetOffsetY = { -it },
+                animationSpec = tween(300)
+            ) + fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            when (overlayState) {
+                OverlayState.PATIENT_DATA -> {
+                    PatientDataOverlay(
+                        onDismiss = {
+                            overlayState = OverlayState.HIDDEN
+                        }
+                    )
+                }
+                OverlayState.SAMPLER -> {
+                    // TODO: Sampler Overlay implementieren
+                    TemporaryOverlay("Sampler Overlay") {
+                        overlayState = OverlayState.HIDDEN
+                    }
+                }
+                OverlayState.XABCDE -> {
+                    // TODO: xABCDE Overlay implementieren
+                    TemporaryOverlay("xABCDE Overlay") {
+                        overlayState = OverlayState.HIDDEN
+                    }
+                }
+                OverlayState.HIDDEN -> {
+                    // Nichts anzeigen
+                }
+            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Temporärer Overlay-Placeholder für zukünftige Features
+ */
 @Composable
-fun PatientDataOverlay(
+private fun TemporaryOverlay(
+    title: String,
     onDismiss: () -> Unit
 ) {
-    val patientManager = remember { PatientDataManager.getInstance() }
-    val currentPatient by patientManager.currentPatient.collectAsStateWithLifecycle()
-
-    // Drag-Offset für Overlay
-    var dragOffset by remember { mutableStateOf(0f) }
-
-    // Lokaler Edit-State
-    var tempAgeYears by remember { mutableStateOf(currentPatient.ageYears.toString()) }
-    var tempAgeMonths by remember { mutableStateOf(currentPatient.ageMonths.toString()) }
-    var tempWeight by remember {
-        mutableStateOf(
-            if (currentPatient.isManualWeight) currentPatient.weightKg.toString() else ""
-        )
-    }
-    var tempGender by remember { mutableStateOf(currentPatient.gender) }
-
-    // Overlay-Container
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .zIndex(10f)
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragEnd = {
-                        // Overlay schließen bei Swipe nach oben
-                        if (dragOffset < -200) {
-                            onDismiss()
-                        }
-                        dragOffset = 0f
-                    }
-                ) { _, dragAmount ->
-                    dragOffset += dragAmount.y
-                }
-            }
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color.Black.copy(alpha = 0.6f)
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.7f)
-                .align(Alignment.TopCenter)
-                .systemBarsPadding(), // Notch-Problem behoben
-            shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                // Header mit Close-Button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Patientendaten",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Schließen")
-                    }
-                }
-
-                // Aktueller Patient Status
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "Aktueller Patient:",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text("Alter: ${currentPatient.getFormattedAge()}")
-                        Text("Gewicht: ${currentPatient.getFormattedWeight()}")
-                        Text("Kategorie: ${currentPatient.ageCategory}")
-                    }
-                }
-
-                Divider()
-
-                // Eingabefelder
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = tempAgeYears,
-                        onValueChange = { tempAgeYears = it },
-                        label = { Text("Jahre") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = tempAgeMonths,
-                        onValueChange = { tempAgeMonths = it },
-                        label = { Text("Monate") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = tempWeight,
-                    onValueChange = { tempWeight = it },
-                    label = { Text("Gewicht (kg, optional)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    supportingText = { Text("Leer lassen für automatische Schätzung") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Geschlecht-Auswahl
                 Text(
-                    "Geschlecht:",
-                    style = MaterialTheme.typography.titleSmall
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    listOf(PatientGender.MALE, PatientGender.FEMALE).forEach { gender ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = tempGender == gender,
-                                onClick = { tempGender = gender }
-                            )
-                            Text(
-                                text = when (gender) {
-                                    PatientGender.MALE -> "Männlich"
-                                    PatientGender.FEMALE -> "Weiblich"
-                                    PatientGender.UNKNOWN -> "Unbekannt" // Wird nicht erreicht
-                                },
-                                modifier = Modifier.padding(start = 4.dp)
-                            )
-                        }
-                    }
-                }
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Quick-Patient Buttons
                 Text(
-                    "Schnellauswahl:",
-                    style = MaterialTheme.typography.titleSmall
+                    text = "Wird in der nächsten Version implementiert",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            tempAgeYears = "0"
-                            tempAgeMonths = "6"
-                            tempWeight = ""
-                            tempGender = PatientGender.UNKNOWN
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Säugling")
-                    }
-                    Button(
-                        onClick = {
-                            tempAgeYears = "8"
-                            tempAgeMonths = "0"
-                            tempWeight = ""
-                            tempGender = PatientGender.UNKNOWN
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Kind")
-                    }
-                    Button(
-                        onClick = {
-                            tempAgeYears = "35"
-                            tempAgeMonths = "0"
-                            tempWeight = ""
-                            tempGender = PatientGender.UNKNOWN
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Erwachsener")
-                    }
-                }
 
-                // Action Buttons
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Abbrechen")
-                    }
+                Spacer(modifier = Modifier.height(24.dp))
 
-                    Button(
-                        onClick = {
-                            try {
-                                val years = tempAgeYears.toIntOrNull() ?: 0
-                                val months = tempAgeMonths.toIntOrNull() ?: 0
-                                val weightValue = tempWeight.toDoubleOrNull()
-
-                                val updatedPatient = if (weightValue != null && weightValue > 0) {
-                                    com.rdinfo2.data.patient.PatientDataFactory.createWithWeight(
-                                        years, months, weightValue, tempGender
-                                    )
-                                } else {
-                                    com.rdinfo2.data.patient.PatientDataFactory.create(
-                                        years, months, tempGender
-                                    )
-                                }
-
-                                patientManager.updatePatient(updatedPatient)
-                                onDismiss()
-                            } catch (e: Exception) {
-                                // Handle error - in real app, show error message
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Speichern")
-                    }
+                Button(onClick = onDismiss) {
+                    Text("Schließen")
                 }
             }
         }
     }
-}
-
-enum class OverlayState {
-    NONE,
-    PATIENT_DATA,
-    SAMPLER,        // Für später
-    XABCDE          // Für später
 }

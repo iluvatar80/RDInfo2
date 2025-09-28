@@ -16,40 +16,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.rdinfo2.data.patient.PatientDataManager
-import com.rdinfo2.data.patient.PatientData
-import com.rdinfo2.logic.PatientCalculator
-import com.rdinfo2.logic.VitalParameters
+import com.rdinfo2.data.PatientDataManager
+import com.rdinfo2.data.Gender
 
 /**
- * SIMPLIFIED: MedicationCalculatorScreen die nur existierende Datenmodelle verwendet
- * Funktioniert mit PatientDataManager, PatientData und PatientCalculator
+ * FINAL: MedicationCalculatorScreen - Funktioniert mit altem PatientDataManager
+ * Verwendet nur existierende Klassen ohne Import-Probleme
  */
 @Composable
 fun MedicationCalculatorScreen(
     modifier: Modifier = Modifier
 ) {
-    // Aktuelle Patientendaten
-    val currentPatient = PatientData(
-        ageYears = PatientDataManager.ageYears,
-        ageMonths = PatientDataManager.ageMonths,
-        weightKg = PatientDataManager.estimatedWeightKg,
-        gender = when (PatientDataManager.gender) {
-            com.rdinfo2.data.patient.PatientGender.MALE -> com.rdinfo2.data.patient.PatientGender.MALE
-            com.rdinfo2.data.patient.PatientGender.FEMALE -> com.rdinfo2.data.patient.PatientGender.FEMALE
-            com.rdinfo2.data.patient.PatientGender.UNKNOWN -> com.rdinfo2.data.patient.PatientGender.UNKNOWN
-        }
-    )
-
-    // Berechnete Vitalparameter
-    val vitalParams = remember(currentPatient.ageYears, currentPatient.ageMonths, currentPatient.weightKg) {
-        PatientCalculator.calculateVitalParameters(
-            ageYears = currentPatient.ageYears,
-            ageMonths = currentPatient.ageMonths,
-            weightKg = currentPatient.weightKg
-        )
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -69,29 +46,34 @@ fun MedicationCalculatorScreen(
         ) {
             // Patienteninfo-Card
             item {
-                PatientInfoCard(currentPatient)
-            }
-
-            // Vitalparameter-Card
-            item {
-                VitalParametersCard(vitalParams)
+                PatientInfoCard()
             }
 
             // Gewichtsschätzung-Card
             item {
-                WeightEstimationCard(currentPatient)
+                WeightEstimationCard()
+            }
+
+            // Altersklassifikation-Card
+            item {
+                AgeClassificationCard()
             }
 
             // Medikamenten-Platzhalter
             item {
                 MedicationPlaceholderCard()
             }
+
+            // Gesten-Hinweis
+            item {
+                GestureHintCard()
+            }
         }
     }
 }
 
 @Composable
-private fun PatientInfoCard(patient: PatientData) {
+private fun PatientInfoCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -120,22 +102,23 @@ private fun PatientInfoCard(patient: PatientData) {
                 )
             }
 
-            val ageText = if (patient.ageMonths > 0) {
-                "${patient.ageYears} Jahre, ${patient.ageMonths} Monate"
-            } else {
-                "${patient.ageYears} Jahre"
-            }
-
             Text(
-                text = "$ageText, ${String.format("%.1f", patient.weightKg)} kg",
+                text = PatientDataManager.getPatientSummary(),
                 fontSize = 16.sp,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            val ageClassification = when {
+                PatientDataManager.isInfant -> "👶 Säugling (0-12 Monate)"
+                PatientDataManager.isChild -> "🧒 Kind (1-17 Jahre)"
+                PatientDataManager.isAdult -> "👨 Erwachsener (18+ Jahre)"
+                else -> "👤 Patient"
+            }
+
             Text(
-                text = PatientCalculator.getAgeCategory(patient.ageYears, patient.ageMonths),
+                text = ageClassification,
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -144,87 +127,7 @@ private fun PatientInfoCard(patient: PatientData) {
 }
 
 @Composable
-private fun VitalParametersCard(vitalParams: VitalParameters) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = "Vitalparameter (Normalwerte)",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            VitalParameterRow(
-                label = "Herzfrequenz:",
-                value = "${vitalParams.heartRateMin}-${vitalParams.heartRateMax}",
-                unit = "bpm"
-            )
-
-            VitalParameterRow(
-                label = "Atemfrequenz:",
-                value = "${vitalParams.respiratoryRateMin}-${vitalParams.respiratoryRateMax}",
-                unit = "/min"
-            )
-
-            VitalParameterRow(
-                label = "Systol. RR:",
-                value = "${vitalParams.systolicBPMin}-${vitalParams.systolicBPMax}",
-                unit = "mmHg"
-            )
-
-            vitalParams.tidalVolume?.let { tidalVolume ->
-                VitalParameterRow(
-                    label = "Atemzugvolumen:",
-                    value = String.format("%.1f", tidalVolume),
-                    unit = "ml/kg"
-                )
-            }
-
-            VitalParameterRow(
-                label = "Flüssigkeitsbedarf:",
-                value = String.format("%.0f", vitalParams.fluidRequirement),
-                unit = "ml/kg/Tag"
-            )
-        }
-    }
-}
-
-@Composable
-private fun VitalParameterRow(
-    label: String,
-    value: String,
-    unit: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
-        Text(
-            text = "$value $unit",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
-    }
-}
-
-@Composable
-private fun WeightEstimationCard(patient: PatientData) {
+private fun WeightEstimationCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -253,20 +156,19 @@ private fun WeightEstimationCard(patient: PatientData) {
                 )
             }
 
-            val estimatedWeight = PatientCalculator.estimateWeight(patient.ageYears, patient.ageMonths)
-            val formula = when {
-                patient.ageYears == 0 -> "3 kg + (Monate × 0.7 kg)"
-                patient.ageYears in 1..5 -> "(Alter × 2) + 8 kg"
-                patient.ageYears in 6..12 -> "(Alter × 3) + 7 kg"
-                patient.ageYears in 13..17 -> "50 + (Alter - 13) × 5 kg"
-                else -> "Standard Erwachsenengewicht"
-            }
-
             Text(
-                text = "Geschätzt: ${String.format("%.1f", estimatedWeight)} kg",
+                text = "Aktuell: ${String.format("%.1f", PatientDataManager.estimatedWeightKg)} kg",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onTertiaryContainer
             )
+
+            val formula = when {
+                PatientDataManager.ageYears == 0 -> "3 kg + (Monate × 0.7 kg)"
+                PatientDataManager.ageYears in 1..5 -> "(Alter × 2) + 8 kg"
+                PatientDataManager.ageYears in 6..12 -> "(Alter × 3) + 7 kg"
+                PatientDataManager.ageYears in 13..17 -> "50 + (Alter - 13) × 5 kg"
+                else -> "Standard Erwachsenengewicht"
+            }
 
             Text(
                 text = "Formel: $formula",
@@ -274,6 +176,77 @@ private fun WeightEstimationCard(patient: PatientData) {
                 color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
                 modifier = Modifier.padding(top = 4.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun AgeClassificationCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Altersklassifikation",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            val ageText = if (PatientDataManager.ageMonths > 0) {
+                "${PatientDataManager.ageYears} Jahre, ${PatientDataManager.ageMonths} Monate"
+            } else {
+                "${PatientDataManager.ageYears} Jahre"
+            }
+
+            Text(
+                text = "Alter: $ageText",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+
+            Text(
+                text = "Gesamtmonate: ${PatientDataManager.totalAgeInMonths}",
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+
+            val characteristics = when {
+                PatientDataManager.isInfant -> listOf(
+                    "• Obligate Nasenatmung bis 6 Monate",
+                    "• Großer Kopf, kurzer Hals",
+                    "• Atemwege sehr eng (4mm = massive Verlegung)",
+                    "• Hypothermierisiko hoch"
+                )
+                PatientDataManager.isChild -> listOf(
+                    "• Atemwege noch entwicklungsbedingt enger",
+                    "• Gewichtsschätzung nach Formeln möglich",
+                    "• Medikamentendosierung altersabhängig"
+                )
+                PatientDataManager.isAdult -> listOf(
+                    "• Standard-Medikamentendosierung",
+                    "• Berücksichtigung von Begleiterkrankungen",
+                    "• Gewicht meist bekannt oder geschätzt"
+                )
+                else -> listOf("• Standardpatient")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            characteristics.forEach { characteristic ->
+                Text(
+                    text = characteristic,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(vertical = 1.dp)
+                )
+            }
         }
     }
 }
@@ -314,30 +287,67 @@ private fun MedicationPlaceholderCard() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+            Text(
+                text = "📋 Geplante Features:",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            val features = listOf(
+                "• Dosierungsberechnung nach Alter/Gewicht",
+                "• Unterstützung für alle Darreichungsformen",
+                "• Automatische Maximaldosis-Kontrolle",
+                "• Warnungen bei kritischen Dosierungen",
+                "• Integration mit Patientendaten"
+            )
+
+            features.forEach { feature ->
+                Text(
+                    text = feature,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 1.dp)
                 )
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp)
-                ) {
-                    Text(
-                        text = "💡 Gesten-Navigation",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "• Von oben wischen: Patientendaten eingeben\n• Von links wischen: SAMPLER-Schema\n• Von rechts wischen: xABCDE-Schema",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
             }
+        }
+    }
+}
+
+@Composable
+private fun GestureHintCard() {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "💡 Gesten-Navigation",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Text(
+                text = "• Von oben wischen: Patientendaten eingeben\n• Von links wischen: SAMPLER-Schema\n• Von rechts wischen: xABCDE-Schema",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Hinweis: Gesten-System wird in der nächsten Version aktiviert",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            )
         }
     }
 }

@@ -1,101 +1,181 @@
 // app/src/main/java/com/rdinfo2/logic/DosingCalculator.kt
 package com.rdinfo2.logic
 
-import com.rdinfo2.data.patient.PatientData
+import com.rdinfo2.data.model.*
+import kotlin.math.round
 
 /**
- * TEMPORÄRE Version für Tests
- * TODO: Später durch vollständiges System mit Medikamenten-Datenbank ersetzen
+ * Vereinfachter DosingCalculator ohne Konflikte
+ * Funktioniert mit bereinigten Datenmodellen
  */
 object DosingCalculator {
 
-    // Temporäre Sample-Medikamente - werden später durch DB ersetzt
-    private val sampleMedications = listOf(
-        "Paracetamol",
-        "Ibuprofen",
-        "Midazolam",
-        "Adrenalin"
-    )
+    /**
+     * Hauptberechnung für Medikamentendosierung
+     */
+    fun calculateDose(
+        medication: SimpleMedication,
+        weightKg: Double,
+        ageMonths: Int
+    ): SimpleDoseCalculation {
 
-    fun getSampleMedications(): List<String> {
-        return sampleMedications
-    }
-
-    fun calculateDosage(medication: String, weightKg: Double, ageYears: Int): DosingResult {
-        val dose = when (medication) {
-            "Paracetamol" -> {
-                val calculatedDose = (weightKg * 15).coerceAtMost(1000.0)
-                DosingResult(
-                    medication = medication,
-                    dose = calculatedDose,
-                    unit = "mg",
-                    formula = "15 mg/kg",
-                    maxDose = "1000 mg",
-                    route = "p.o./i.v."
-                )
-            }
-            "Ibuprofen" -> {
-                val calculatedDose = (weightKg * 10).coerceAtMost(600.0)
-                DosingResult(
-                    medication = medication,
-                    dose = calculatedDose,
-                    unit = "mg",
-                    formula = "10 mg/kg",
-                    maxDose = "600 mg",
-                    route = "p.o."
-                )
-            }
-            "Midazolam" -> {
-                val calculatedDose = (weightKg * 0.1).coerceAtMost(10.0)
-                DosingResult(
-                    medication = medication,
-                    dose = calculatedDose,
-                    unit = "mg",
-                    formula = "0,1 mg/kg",
-                    maxDose = "10 mg",
-                    route = "i.v./i.m."
-                )
-            }
-            "Adrenalin" -> {
-                val calculatedDose = (weightKg * 0.01).coerceAtMost(1.0)
-                DosingResult(
-                    medication = medication,
-                    dose = calculatedDose,
-                    unit = "mg",
-                    formula = "0,01 mg/kg",
-                    maxDose = "1 mg",
-                    route = "i.v./i.m."
-                )
-            }
-            else -> DosingResult(
-                medication = "Unbekannt",
-                dose = 0.0,
-                unit = "",
-                formula = "",
-                maxDose = "",
-                route = ""
-            )
+        // Input validation
+        if (weightKg <= 0) {
+            return SimpleDoseCalculation.invalid("Gewicht muss größer als 0 kg sein")
         }
 
-        return dose
-    }
-}
-
-data class DosingResult(
-    val medication: String,
-    val dose: Double,
-    val unit: String,
-    val formula: String,
-    val maxDose: String,
-    val route: String
-) {
-    fun getDisplayText(): String {
-        val formattedDose = if (dose % 1.0 == 0.0) {
-            dose.toInt().toString()
-        } else {
-            String.format("%.1f", dose)
+        if (ageMonths < 0) {
+            return SimpleDoseCalculation.invalid("Alter kann nicht negativ sein")
         }
 
-        return "$medication: $formattedDose $unit\n($formula, max. $maxDose)\nApplikation: $route"
+        // Altersbereich prüfen
+        medication.ageRestrictions?.let { restrictions ->
+            val minAge = restrictions.minAgeMonths ?: 0
+            val maxAge = restrictions.maxAgeMonths ?: Int.MAX_VALUE
+
+            if (ageMonths < minAge || ageMonths > maxAge) {
+                val ageYears = ageMonths / 12.0
+                return SimpleDoseCalculation.invalid(
+                    "Medikament nicht für Alter ${String.format("%.1f", ageYears)} Jahre zugelassen"
+                )
+            }
+        }
+
+        // Dosisberechnung
+        val calculatedDose = when {
+            medication.dosePerKg != null -> {
+                // Gewichtsbasierte Dosierung
+                weightKg * medication.dosePerKg
+            }
+            medication.fixedDose != null -> {
+                // Fixe Dosierung
+                medication.fixedDose
+            }
+            else -> {
+                return SimpleDoseCalculation.invalid("Keine Dosierungsregel definiert")
+            }
+        }
+
+        // Maximaldosis anwenden
+        val finalDose = medication.maxDose?.let { maxDose ->
+            if (calculatedDose > maxDose) maxDose else calculatedDose
+        } ?: calculatedDose
+
+        // Rundung (medizinisch sinnvoll)
+        val roundedDose = round(finalDose * 100) / 100  // 2 Dezimalstellen
+
+        // Volumen berechnen
+        val volume = roundedDose / medication.concentration
+        val roundedVolume = round(volume * 10) / 10  // 1 Dezimalstelle
+
+        // Berechnung als Text
+        val calculation = buildCalculationText(medication, weightKg, ageMonths, calculatedDose, finalDose, roundedDose)
+
+        // Warnungen generieren
+        val warnings = generateWarnings(medication, roundedDose, weightKg, ageMonths)
+
+        return SimpleDoseCalculation(
+            dose = roundedDose,
+            volume = roundedVolume,
+            unit = medication.unit,
+            calculation = calculation,
+            warnings = warnings,
+            isValid = true
+        )
+    }
+
+    /**
+     * Berechnung als lesbarer Text
+     */
+    private fun buildCalculationText(
+        medication: SimpleMedication,
+        weightKg: Double,
+        ageMonths: Int,
+        calculatedDose: Double,
+        finalDose: Double,
+        roundedDose: Double
+    ): String {
+        val ageYears = ageMonths / 12.0
+
+        return buildString {
+            appendLine("Berechnung für ${medication.name}:")
+            appendLine("Patient: ${String.format("%.1f", ageYears)} Jahre, ${weightKg} kg")
+
+            when {
+                medication.dosePerKg != null -> {
+                    appendLine("Dosierung: ${medication.dosePerKg} ${medication.unit}/kg")
+                    appendLine("Berechnet: ${weightKg} kg × ${medication.dosePerKg} = ${String.format("%.2f", calculatedDose)} ${medication.unit}")
+                }
+                medication.fixedDose != null -> {
+                    appendLine("Fixdosis: ${calculatedDose} ${medication.unit}")
+                }
+            }
+
+            if (finalDose != calculatedDose) {
+                appendLine("Maximum angewendet: ${String.format("%.2f", finalDose)} ${medication.unit}")
+            }
+
+            if (roundedDose != finalDose) {
+                appendLine("Gerundet: ${String.format("%.2f", roundedDose)} ${medication.unit}")
+            }
+
+            val volume = roundedDose / medication.concentration
+            appendLine("Volumen: ${String.format("%.1f", volume)} ml")
+        }
+    }
+
+    /**
+     * Warnungen generieren
+     */
+    private fun generateWarnings(
+        medication: SimpleMedication,
+        dose: Double,
+        weightKg: Double,
+        ageMonths: Int
+    ): List<String> {
+        val warnings = mutableListOf<String>()
+
+        // Maximaldosis erreicht
+        medication.maxDose?.let { maxDose ->
+            if (dose >= maxDose * 0.95) {  // 95% der Maximaldosis
+                warnings.add("⚠️ Nahe Maximaldosis erreicht")
+            }
+        }
+
+        // Alterswarnung
+        val ageYears = ageMonths / 12.0
+        when {
+            ageYears < 1 -> warnings.add("⚠️ Säugling - besondere Vorsicht")
+            ageYears > 65 -> warnings.add("⚠️ Geriatrischer Patient")
+        }
+
+        // Gewichtswarnung
+        when {
+            weightKg < 5 -> warnings.add("⚠️ Sehr niedriges Gewicht")
+            weightKg > 100 -> warnings.add("⚠️ Adipositas - Dosisanpassung erwägen")
+        }
+
+        return warnings
+    }
+
+    /**
+     * Alle verfügbaren Medikamente abrufen
+     */
+    fun getAllMedications(): List<SimpleMedication> {
+        return StandardMedications.medications
+    }
+
+    /**
+     * Medikament nach ID finden
+     */
+    fun getMedicationById(id: String): SimpleMedication? {
+        return StandardMedications.medications.find { it.id == id }
+    }
+
+    /**
+     * Medikamente nach Kategorie filtern
+     */
+    fun getMedicationsByCategory(category: SimpleMedicationCategory): List<SimpleMedication> {
+        return StandardMedications.medications.filter { it.category == category }
     }
 }

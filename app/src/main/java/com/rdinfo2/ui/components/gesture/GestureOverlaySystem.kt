@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import com.rdinfo2.data.PatientDataManager  // FIXED: Korrekte Import-Pfade
+import com.rdinfo2.data.patient.PatientDataManager  // FIXED: Korrekte Import-Pfade
 import com.rdinfo2.ui.components.overlays.PatientDataOverlay
 
 /**

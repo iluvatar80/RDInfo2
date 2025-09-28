@@ -3,7 +3,6 @@
 
 package com.rdinfo2.ui.components.overlays
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,19 +22,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.rdinfo2.data.PatientDataManager
-import com.rdinfo2.data.Gender
+import com.rdinfo2.data.patient.PatientDataManager
+import com.rdinfo2.data.patient.PatientGender
 
 /**
- * FINAL CORRECTED: Patientendaten-Overlay ohne Icon-Fehler
- * Alle Icons sind verfügbar und korrekt referenziert
+ * WORKING: Patientendaten-Overlay ohne Compile-Fehler
+ * Funktioniert mit korrigiertem PatientDataManager
  */
 @Composable
 fun PatientDataOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Local state synced mit PatientDataManager
+    // Local state mit korrekten Typen
     var localAgeYears by remember { mutableStateOf(PatientDataManager.ageYears.toString()) }
     var localAgeMonths by remember { mutableStateOf(PatientDataManager.ageMonths.toString()) }
     var localWeight by remember { mutableStateOf(PatientDataManager.weightKg?.toString() ?: "") }
@@ -51,7 +50,7 @@ fun PatientDataOverlay(
     }
 
     LaunchedEffect(localWeight) {
-        val weight = localWeight.toDoubleOrNull()
+        val weight = if (localWeight.isBlank()) null else localWeight.toDoubleOrNull()
         PatientDataManager.updateWeight(weight)
     }
 
@@ -81,7 +80,7 @@ fun PatientDataOverlay(
                         .padding(20.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // Header mit Close Button
+                    // Header
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -97,8 +96,7 @@ fun PatientDataOverlay(
                         IconButton(onClick = onDismiss) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Schließen",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                contentDescription = "Schließen"
                             )
                         }
                     }
@@ -117,7 +115,7 @@ fun PatientDataOverlay(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Säugling Button - CORRECTED ICON
+                        // Säugling
                         OutlinedButton(
                             onClick = {
                                 PatientDataManager.setInfant()
@@ -129,7 +127,7 @@ fun PatientDataOverlay(
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Pets,  // CORRECTED: Pets statt Baby
+                                imageVector = Icons.Default.Pets,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -137,7 +135,7 @@ fun PatientDataOverlay(
                             Text("Säugling")
                         }
 
-                        // Kind Button - CORRECTED ICON
+                        // Kind
                         OutlinedButton(
                             onClick = {
                                 PatientDataManager.setChild()
@@ -149,7 +147,7 @@ fun PatientDataOverlay(
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Face,  // CORRECTED: Face statt Child
+                                imageVector = Icons.Default.Face,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -157,7 +155,7 @@ fun PatientDataOverlay(
                             Text("Kind")
                         }
 
-                        // Erwachsener Button
+                        // Erwachsener
                         OutlinedButton(
                             onClick = {
                                 PatientDataManager.setAdult()
@@ -190,15 +188,14 @@ fun PatientDataOverlay(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         // Jahre
                         OutlinedTextField(
                             value = localAgeYears,
-                            onValueChange = {
-                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                    localAgeYears = it
+                            onValueChange = { value ->
+                                if (value.isEmpty() || value.all { char -> char.isDigit() }) {
+                                    localAgeYears = value
                                 }
                             },
                             label = { Text("Jahre") },
@@ -210,9 +207,9 @@ fun PatientDataOverlay(
                         // Monate
                         OutlinedTextField(
                             value = localAgeMonths,
-                            onValueChange = {
-                                if (it.isEmpty() || (it.all { char -> char.isDigit() } && (it.toIntOrNull() ?: 0) <= 11)) {
-                                    localAgeMonths = it
+                            onValueChange = { value ->
+                                if (value.isEmpty() || (value.all { char -> char.isDigit() } && (value.toIntOrNull() ?: 0) <= 11)) {
+                                    localAgeMonths = value
                                 }
                             },
                             label = { Text("Monate (0-11)") },
@@ -234,9 +231,9 @@ fun PatientDataOverlay(
 
                     OutlinedTextField(
                         value = localWeight,
-                        onValueChange = {
-                            if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
-                                localWeight = it
+                        onValueChange = { value ->
+                            if (value.isEmpty() || value.matches(Regex("^\\d*\\.?\\d*$"))) {
+                                localWeight = value
                             }
                         },
                         label = { Text("Gewicht in kg (optional)") },
@@ -268,23 +265,23 @@ fun PatientDataOverlay(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         FilterChip(
-                            onClick = { localGender = Gender.MALE },
+                            onClick = { localGender = PatientGender.MALE },
                             label = { Text("Männlich") },
-                            selected = localGender == Gender.MALE,
+                            selected = localGender == PatientGender.MALE,
                             modifier = Modifier.weight(1f)
                         )
 
                         FilterChip(
-                            onClick = { localGender = Gender.FEMALE },
+                            onClick = { localGender = PatientGender.FEMALE },
                             label = { Text("Weiblich") },
-                            selected = localGender == Gender.FEMALE,
+                            selected = localGender == PatientGender.FEMALE,
                             modifier = Modifier.weight(1f)
                         )
 
                         FilterChip(
-                            onClick = { localGender = Gender.UNKNOWN },
+                            onClick = { localGender = PatientGender.UNKNOWN },
                             label = { Text("Unbekannt") },
-                            selected = localGender == Gender.UNKNOWN,
+                            selected = localGender == PatientGender.UNKNOWN,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -316,18 +313,10 @@ fun PatientDataOverlay(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
 
-                            // Altersklassifikation
-                            val ageClassification = when {
-                                PatientDataManager.isInfant -> "👶 Säugling"
-                                PatientDataManager.isChild -> "🧒 Kind"
-                                PatientDataManager.isAdult -> "👨 Erwachsener"
-                                else -> "👤 Patient"
-                            }
-
                             Spacer(modifier = Modifier.height(4.dp))
 
                             Text(
-                                text = "Klassifikation: $ageClassification",
+                                text = "Klassifikation: ${PatientDataManager.getAgeClassification()}",
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )

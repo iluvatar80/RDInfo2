@@ -9,12 +9,13 @@ import org.json.JSONObject
 import java.io.IOException
 
 /**
- * VERBESSERTER Loader - Lädt Medikamenten-Daten aus JSON-Datei
- * Kompatibel mit der aktuellen medications.json Struktur
+ * Lädt Medikamenten-Daten aus JSON v3.0
  */
 class JsonMedicationLoader(private val context: Context) {
 
-    private val TAG = "JsonMedicationLoader"
+    companion object {
+        private const val TAG = "JsonMedicationLoader"
+    }
 
     /**
      * Lädt alle Medikamente aus medications.json
@@ -26,31 +27,27 @@ class JsonMedicationLoader(private val context: Context) {
             val rootJson = JSONObject(jsonString)
             val medicationsArray = rootJson.getJSONArray("medications")
 
-            Log.d(TAG, "JSON enthält ${medicationsArray.length()} Medikamente")
-
             val medications = mutableListOf<Medication>()
             for (i in 0 until medicationsArray.length()) {
                 try {
-                    val medication = parseMedication(medicationsArray.getJSONObject(i))
-                    medications.add(medication)
-                    Log.d(TAG, "✓ ${medication.name} erfolgreich geladen")
+                    medications.add(parseMedication(medicationsArray.getJSONObject(i)))
                 } catch (e: Exception) {
-                    Log.e(TAG, "✗ Fehler beim Parsen von Medikament $i: ${e.message}")
+                    Log.e(TAG, "Fehler beim Parsen von Medikament $i: ${e.message}", e)
                 }
             }
 
-            Log.d(TAG, "Insgesamt ${medications.size} Medikamente erfolgreich geladen")
+            Log.d(TAG, "Erfolgreich ${medications.size} Medikamente geladen")
+            medications.forEach { med ->
+                Log.d(TAG, "  - ${med.name} (${med.id})")
+            }
+
             medications
         } catch (e: Exception) {
             Log.e(TAG, "Schwerer Fehler beim Laden: ${e.message}", e)
-            // Fallback auf Factory-Medikamente bei Fehler
-            EmergencyMedications.getStandardSet()
+            emptyList()
         }
     }
 
-    /**
-     * JSON-Datei aus Assets laden
-     */
     private fun loadJsonFromAssets(fileName: String): String {
         return try {
             context.assets.open(fileName).bufferedReader().use { it.readText() }
@@ -59,170 +56,155 @@ class JsonMedicationLoader(private val context: Context) {
         }
     }
 
-    /**
-     * Einzelnes Medikament aus JSON parsen
-     */
     private fun parseMedication(json: JSONObject): Medication {
-        val id = json.getString("id")
-        val name = json.getString("name")
-
-        Log.d(TAG, "Parse Medikament: $name ($id)")
-
         return Medication(
-            id = id,
-            name = name,
+            id = json.getString("id"),
+            name = json.getString("name"),
             genericName = json.optString("genericName").takeIf { it.isNotEmpty() },
-            category = parseCategory(json.optString("category", "OTHER")),
-            indications = parseIndications(json.getJSONArray("indications")),
-            contraindications = parseStringArray(json.optJSONArray("contraindications")),
-            warnings = parseStringArray(json.optJSONArray("warnings")),
-            notes = json.optString("notes").takeIf { it.isNotEmpty() }
+            category = parseMedicationCategory(json.getString("category")),
+            globalInfo = parseGlobalInfo(json.getJSONObject("globalInfo")),
+            preparations = parsePreparations(json.getJSONArray("preparations")),
+            useCases = parseUseCases(json.getJSONArray("useCases"))
         )
     }
 
-    /**
-     * Kategorie parsen mit Fehlerbehandlung
-     */
-    private fun parseCategory(categoryString: String): MedicationCategory {
-        return try {
-            MedicationCategory.valueOf(categoryString)
-        } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Unbekannte Kategorie: $categoryString, verwende OTHER")
-            MedicationCategory.OTHER
-        }
+    private fun parseGlobalInfo(json: JSONObject): GlobalInfo {
+        return GlobalInfo(
+            indications = json.getString("indications"),
+            mechanism = json.getString("mechanism"),
+            sideEffects = json.getString("sideEffects"),
+            contraindications = json.getString("contraindications")
+        )
     }
 
-    /**
-     * Indikationen aus JSON parsen
-     */
-    private fun parseIndications(jsonArray: JSONArray): List<Indication> {
-        val indications = mutableListOf<Indication>()
+    private fun parsePreparations(jsonArray: JSONArray): List<Preparation> {
+        val preparations = mutableListOf<Preparation>()
         for (i in 0 until jsonArray.length()) {
-            try {
-                val indicationJson = jsonArray.getJSONObject(i)
-                indications.add(
-                    Indication(
-                        name = indicationJson.getString("name"),
-                        dosageRules = parseDosageRules(indicationJson.getJSONArray("dosageRules")),
-                        route = indicationJson.getString("route"),
-                        preparation = indicationJson.optString("preparation").takeIf { it.isNotEmpty() },
-                        maxDose = if (indicationJson.has("maxDose") && !indicationJson.isNull("maxDose")) {
-                            parseMaxDose(indicationJson.getJSONObject("maxDose"))
-                        } else null
-                    )
+            val prepJson = jsonArray.getJSONObject(i)
+            preparations.add(
+                Preparation(
+                    id = prepJson.getString("id"),
+                    type = parsePreparationType(prepJson.getString("type")),
+                    concentration = prepJson.getDouble("concentration"),
+                    concentrationUnit = prepJson.getString("concentrationUnit"),
+                    volume = prepJson.getDouble("volume"),
+                    volumeUnit = prepJson.getString("volumeUnit"),
+                    description = prepJson.getString("description")
                 )
-            } catch (e: Exception) {
-                Log.e(TAG, "Fehler beim Parsen von Indikation $i: ${e.message}")
-            }
+            )
         }
-        return indications
+        return preparations
     }
 
-    /**
-     * Dosierungsregeln aus JSON parsen
-     */
-    private fun parseDosageRules(jsonArray: JSONArray): List<DosageRule> {
-        val rules = mutableListOf<DosageRule>()
+    private fun parseUseCases(jsonArray: JSONArray): List<UseCase> {
+        val useCases = mutableListOf<UseCase>()
         for (i in 0 until jsonArray.length()) {
-            try {
-                val ruleJson = jsonArray.getJSONObject(i)
-                val ageGroupString = ruleJson.getString("ageGroup")
-                val ageGroup = parseAgeGroup(ageGroupString)
+            val useCaseJson = jsonArray.getJSONObject(i)
+            useCases.add(
+                UseCase(
+                    id = useCaseJson.getString("id"),
+                    name = useCaseJson.getString("name"),
+                    route = useCaseJson.getString("route"),
+                    preparation = parseUseCasePreparation(useCaseJson.getJSONObject("preparation")),
+                    dosingRules = parseDosingRules(useCaseJson.getJSONArray("dosingRules"))
+                )
+            )
+        }
+        return useCases
+    }
 
-                if (ageGroup != null) {
-                    rules.add(
-                        DosageRule(
-                            ageGroup = ageGroup,
-                            calculation = parseDosageCalculation(ruleJson.getJSONObject("calculation")),
-                            unit = ruleJson.getString("unit"),
-                            volume = ruleJson.optString("volume").takeIf { it.isNotEmpty() },
-                            note = ruleJson.optString("note").takeIf { it.isNotEmpty() }
-                        )
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Fehler beim Parsen von DosageRule $i: ${e.message}")
-            }
+    private fun parseUseCasePreparation(json: JSONObject): UseCasePreparation {
+        return UseCasePreparation(
+            preparationId = json.getString("preparationId"),
+            dilution = json.optJSONObject("dilution")?.let { parseDilution(it) },
+            nebulization = json.optJSONObject("nebulization")?.let { parseNebulization(it) }
+        )
+    }
+
+    private fun parseDilution(json: JSONObject): Dilution {
+        return Dilution(
+            ratio = json.optString("ratio").takeIf { it.isNotEmpty() },
+            solvent = json.optString("solvent").takeIf { it.isNotEmpty() },
+            finalConcentration = if (json.has("finalConcentration")) json.getDouble("finalConcentration") else null,
+            finalConcentrationUnit = json.optString("finalConcentrationUnit").takeIf { it.isNotEmpty() },
+            finalVolume = if (json.has("finalVolume")) json.getDouble("finalVolume") else null,
+            finalVolumeUnit = json.optString("finalVolumeUnit").takeIf { it.isNotEmpty() },
+            note = json.optString("note").takeIf { it.isNotEmpty() }
+        )
+    }
+
+    private fun parseNebulization(json: JSONObject): Nebulization {
+        return Nebulization(
+            dose = if (json.has("dose")) json.getDouble("dose") else null,
+            doseUnit = json.optString("doseUnit").takeIf { it.isNotEmpty() },
+            oxygenFlow = if (json.has("oxygenFlow")) json.getInt("oxygenFlow") else null,
+            oxygenFlowUnit = json.optString("oxygenFlowUnit").takeIf { it.isNotEmpty() }
+        )
+    }
+
+    private fun parseDosingRules(jsonArray: JSONArray): List<DosingRule> {
+        val rules = mutableListOf<DosingRule>()
+        for (i in 0 until jsonArray.length()) {
+            val ruleJson = jsonArray.getJSONObject(i)
+            rules.add(
+                DosingRule(
+                    ruleId = ruleJson.getString("ruleId"),
+                    minAge = if (ruleJson.has("minAge") && !ruleJson.isNull("minAge")) ruleJson.getInt("minAge") else null,
+                    maxAge = if (ruleJson.has("maxAge") && !ruleJson.isNull("maxAge")) ruleJson.getInt("maxAge") else null,
+                    minWeight = if (ruleJson.has("minWeight") && !ruleJson.isNull("minWeight")) ruleJson.getDouble("minWeight") else null,
+                    maxWeight = if (ruleJson.has("maxWeight") && !ruleJson.isNull("maxWeight")) ruleJson.getDouble("maxWeight") else null,
+                    calculation = parseDosageCalculation(ruleJson.getJSONObject("calculation")),
+                    maxSingleDose = if (ruleJson.has("maxSingleDose") && !ruleJson.isNull("maxSingleDose")) ruleJson.getDouble("maxSingleDose") else null,
+                    maxTotalDose = ruleJson.optJSONObject("maxTotalDose")?.let { parseMaxDose(it) },
+                    repetitionInterval = ruleJson.optString("repetitionInterval").takeIf { it.isNotEmpty() },
+                    abortCriteria = ruleJson.optString("abortCriteria").takeIf { it.isNotEmpty() },
+                    note = ruleJson.optString("note").takeIf { it.isNotEmpty() }
+                )
+            )
         }
         return rules
     }
 
-    /**
-     * AgeGroup parsen mit Fehlerbehandlung
-     */
-    private fun parseAgeGroup(ageGroupString: String): AgeGroup? {
-        return try {
-            AgeGroup.valueOf(ageGroupString)
-        } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Unbekannte AgeGroup: $ageGroupString")
-            // Versuche Mapping von häufigen Varianten
-            when (ageGroupString.uppercase()) {
-                "ALL_AGES", "ALL" -> AgeGroup.ALL_AGES
-                "CHILD", "CHILDREN" -> AgeGroup.CHILD
-                "ADULT", "ADULTS" -> AgeGroup.ADULT
-                "ADOLESCENT", "ADOLESCENTS" -> AgeGroup.ADOLESCENT
-                "INFANT", "INFANTS" -> AgeGroup.INFANT
-                "NEONATE", "NEONATES" -> AgeGroup.NEONATE
-                "TODDLER", "TODDLERS" -> AgeGroup.TODDLER
-                "GERIATRIC", "ELDERLY" -> AgeGroup.GERIATRIC
-                else -> null
-            }
-        }
-    }
-
-    /**
-     * Dosierungsberechnung aus JSON parsen
-     */
     private fun parseDosageCalculation(json: JSONObject): DosageCalculation {
-        val typeString = json.getString("type")
-        val type = parseCalculationType(typeString)
-
         return DosageCalculation(
-            type = type,
+            type = parseCalculationType(json.getString("type")),
             value = json.getDouble("value"),
-            minDose = if (json.has("minDose") && !json.isNull("minDose")) {
-                json.getDouble("minDose")
-            } else null,
-            maxDose = if (json.has("maxDose") && !json.isNull("maxDose")) {
-                json.getDouble("maxDose")
-            } else null
+            unit = json.getString("unit")
         )
     }
 
-    /**
-     * CalculationType parsen mit Fehlerbehandlung
-     */
-    private fun parseCalculationType(typeString: String): CalculationType {
-        return try {
-            CalculationType.valueOf(typeString)
-        } catch (e: IllegalArgumentException) {
-            Log.w(TAG, "Unbekannter CalculationType: $typeString, verwende FIXED")
-            CalculationType.FIXED
-        }
-    }
-
-    /**
-     * Maximaldosis aus JSON parsen
-     */
     private fun parseMaxDose(json: JSONObject): MaxDose {
         return MaxDose(
             amount = json.getDouble("amount"),
             unit = json.getString("unit"),
-            timeframe = json.getString("timeframe"),
-            warning = json.optString("warning").takeIf { it.isNotEmpty() }
+            timeframe = json.getString("timeframe")
         )
     }
 
-    /**
-     * String-Array aus JSON parsen
-     */
-    private fun parseStringArray(jsonArray: JSONArray?): List<String> {
-        if (jsonArray == null) return emptyList()
-
-        val strings = mutableListOf<String>()
-        for (i in 0 until jsonArray.length()) {
-            strings.add(jsonArray.getString(i))
+    private fun parseMedicationCategory(category: String): MedicationCategory {
+        return try {
+            MedicationCategory.valueOf(category)
+        } catch (e: Exception) {
+            Log.w(TAG, "Unbekannte Kategorie: $category, verwende OTHER")
+            MedicationCategory.OTHER
         }
-        return strings
+    }
+
+    private fun parsePreparationType(type: String): PreparationType {
+        return try {
+            PreparationType.valueOf(type)
+        } catch (e: Exception) {
+            Log.w(TAG, "Unbekannter Typ: $type, verwende OTHER")
+            PreparationType.OTHER
+        }
+    }
+
+    private fun parseCalculationType(type: String): CalculationType {
+        return try {
+            CalculationType.valueOf(type)
+        } catch (e: Exception) {
+            Log.w(TAG, "Unbekannter Berechnungstyp: $type, verwende FIXED")
+            CalculationType.FIXED
+        }
     }
 }

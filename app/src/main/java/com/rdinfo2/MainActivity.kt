@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
@@ -14,16 +15,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rdinfo2.data.preferences.SettingsManager
 import com.rdinfo2.data.preferences.ThemeMode
-import com.rdinfo2.ui.screens.*
+import com.rdinfo2.ui.components.gesture.GestureOverlayContainer
+import com.rdinfo2.ui.screens.MedicationCalculatorScreen
 import com.rdinfo2.ui.theme.RDInfo2Theme
 
-/**
- * FINAL: MainActivity - Funktioniert garantiert ohne fehlende Imports
- * Entfernt alle problematischen Referenzen
- */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +49,12 @@ fun MainScreen(settingsManager: SettingsManager) {
     }
 
     RDInfo2Theme(darkTheme = darkTheme) {
-        MainContent(settingsManager)
+        // SIMPLIFIED: GestureOverlayContainer umschließt alles
+        GestureOverlayContainer(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            MainContent(settingsManager)
+        }
     }
 }
 
@@ -59,40 +63,36 @@ fun MainContent(settingsManager: SettingsManager) {
     var currentTab by remember { mutableStateOf(MainTab.MEDICATION_CALCULATOR) }
     var showMenu by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Main content with tabs
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .systemBarsPadding()
-        ) {
-            // Top bar with tabs and menu
-            TopAppBarWithTabs(
-                currentTab = currentTab,
-                onTabChange = { currentTab = it },
-                onMenuClick = { showMenu = true }
-            )
+    // Main content with tabs
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+    ) {
+        // Top bar with tabs and menu
+        TopAppBarWithTabs(
+            currentTab = currentTab,
+            onTabChange = { currentTab = it },
+            onMenuClick = { showMenu = true }
+        )
 
-            // Tab content - VERWENDET NUR EXISTIERENDE SCREENS
-            when (currentTab) {
-                MainTab.MEDICATION_CALCULATOR -> {
-                    MedicationCalculatorScreen()
-                }
-                MainTab.ALGORITHMS -> {
-                    AlgorithmsScreen()
-                }
-                MainTab.REFERENCE_VALUES -> {
-                    ReferenceValuesScreen()
-                }
-                MainTab.SPECIAL_REFERENCES -> {
-                    SpecialReferencesScreen()
-                }
+        // Tab content
+        when (currentTab) {
+            MainTab.MEDICATION_CALCULATOR -> {
+                MedicationCalculatorScreen()
+            }
+            MainTab.ALGORITHMS -> {
+                PlaceholderScreen("xABCDE Algorithmen", "Hier werden die interaktiven Flowcharts aus dem Hamburger Rettungsdienst-Handbuch implementiert.")
+            }
+            MainTab.REFERENCE_VALUES -> {
+                PlaceholderScreen("Normalwerte", "Alters- und gewichtsspezifische Normalwerte für Vitalparameter, basierend auf den eingegebenen Patientendaten.")
+            }
+            MainTab.SPECIAL_REFERENCES -> {
+                PlaceholderScreen("Spezielle Nachschlagewerke", "SEPSIS-Score, ISOBAR-Schema, GP-START, Toxidrome, EKG-Interpretation und weitere Hilfsmittel.")
             }
         }
 
-        // ENTFERNT: GestureOverlaySystem - wird später hinzugefügt wenn es funktioniert
-
-        // Main menu dropdown
+        // Main menu dropdown (moved inside content)
         if (showMenu) {
             MainMenuDropdown(
                 onDismiss = { showMenu = false },
@@ -123,7 +123,26 @@ fun TopAppBarWithTabs(
     Column {
         // Top app bar
         TopAppBar(
-            title = { Text("RD-Info2") },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("RD-Info2")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    // DEBUG Indicator
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondary,
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            text = "DEBUG",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
+                    }
+                }
+            },
             actions = {
                 IconButton(onClick = onMenuClick) {
                     Icon(
@@ -139,8 +158,8 @@ fun TopAppBarWithTabs(
             )
         )
 
-        // Tab row - EINFACHE VERSION OHNE PROBLEME
-        TabRow(
+        // Tab row
+        ScrollableTabRow(
             selectedTabIndex = currentTab.ordinal,
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -178,10 +197,10 @@ fun MainMenuDropdown(
             .padding(16.dp),
         contentAlignment = Alignment.TopEnd
     ) {
-        // VEREINFACHT: Ohne DpOffset
         DropdownMenu(
             expanded = true,
-            onDismissRequest = onDismiss
+            onDismissRequest = onDismiss,
+            offset = DpOffset(x = (-8).dp, y = 8.dp)
         ) {
             DropdownMenuItem(
                 text = { Text("Editor") },
@@ -199,10 +218,9 @@ fun MainMenuDropdown(
     }
 }
 
-// PLACEHOLDER SCREENS - ARBEITEN OHNE EXTERNE ABHÄNGIGKEITEN
-
+// Placeholder für andere Screens
 @Composable
-fun AlgorithmsScreen() {
+fun PlaceholderScreen(title: String, description: String) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -216,96 +234,16 @@ fun AlgorithmsScreen() {
             )
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "🏥 xABCDE Algorithmen",
+                    text = title,
                     style = MaterialTheme.typography.headlineSmall
                 )
                 Text(
-                    text = "Hier werden die interaktiven Flowcharts aus dem Hamburger Rettungsdienst-Handbuch implementiert.",
+                    text = description,
                     style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "📱 Algorithmen für systematische Notfallversorgung",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ReferenceValuesScreen() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "📊 Normalwerte",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text(
-                    text = "Alters- und gewichtsspezifische Normalwerte für Vitalparameter, basierend auf den eingegebenen Patientendaten.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "Herzfrequenz, Atemfrequenz, Blutdruck, etc.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SpecialReferencesScreen() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "📚 Spezielle Nachschlagewerke",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text(
-                    text = "SEPSIS-Score, ISOBAR-Schema, GP-START, Toxidrome, EKG-Interpretation und weitere Hilfsmittel.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "Aus dem Hamburger Rettungsdienst-Handbuch extrahiert",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }

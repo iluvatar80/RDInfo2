@@ -3,6 +3,7 @@
 
 package com.rdinfo2.ui.components.gesture
 
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -21,215 +22,163 @@ import androidx.compose.ui.zIndex
 import com.rdinfo2.ui.components.overlays.PatientDataOverlay
 
 /**
- * FUNKTIONIERENDER Gesture-basierter Overlay Container
- * Ersetzt den Placeholder und ermöglicht echte Wischgesten
+ * DEBUG VERSION - Gesture-basierter Overlay Container
+ * Mit Logging und vereinfachter Gesture-Erkennung
  */
 
 @Composable
 fun GestureOverlayContainer(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
 ) {
     var overlayState by remember { mutableStateOf(OverlayState.HIDDEN) }
-    var dragOffset by remember { mutableStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
+    var dragStartY by remember { mutableStateOf(0f) }
+    var currentDragY by remember { mutableStateOf(0f) }
 
     val density = LocalDensity.current
-    val triggerThreshold = with(density) { 150.dp.toPx() }
+    val triggerThreshold = with(density) { 100.dp.toPx() } // Reduzierte Schwelle
+
+    Log.d("GestureDebug", "GestureOverlayContainer rendered, overlayState: $overlayState")
 
     Box(modifier = modifier.fillMaxSize()) {
 
-        // Gesture Detection Layer (nur wenn kein Overlay offen ist)
-        if (overlayState == OverlayState.HIDDEN) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(1f)
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                // Nur Drags vom oberen Bildschirmbereich (erste 80px) erlauben
-                                if (offset.y < 80) {
-                                    isDragging = true
-                                    dragOffset = 0f
-                                }
-                            },
-                            onDragEnd = {
-                                if (isDragging) {
-                                    // Prüfen ob genug nach unten gezogen wurde
-                                    if (dragOffset > triggerThreshold) {
-                                        overlayState = OverlayState.PATIENT_DATA
-                                    }
-                                    isDragging = false
-                                    dragOffset = 0f
-                                }
-                            }
-                        ) { change, _ ->
-                            if (isDragging) {
-                                // Nur nach unten ziehen erlauben
-                                val deltaY = change.position.y
-                                if (deltaY > 0) {
-                                    dragOffset = deltaY.coerceAtMost(triggerThreshold * 1.5f)
-                                }
-                            }
-                        }
-                    }
+        // Hauptinhalt zuerst rendern
+        content()
+
+        // DEBUG: Immer sichtbarer Indikator oben
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp)
+                .zIndex(5f),
+            color = if (overlayState == OverlayState.HIDDEN) {
+                Color.Red.copy(alpha = 0.3f)
+            } else {
+                Color.Green.copy(alpha = 0.8f)
+            },
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(
+                text = if (overlayState == OverlayState.HIDDEN) "WISCHE HIER" else "OVERLAY OFFEN",
+                modifier = Modifier.padding(8.dp),
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall
             )
         }
 
-        // Drag Indicator (zeigt Fortschritt beim Ziehen)
-        if (isDragging && dragOffset > 20) {
-            val progress = (dragOffset / triggerThreshold).coerceIn(0f, 1f)
+        // Vereinfachte Gesture Detection über den gesamten oberen Bereich
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp) // Größerer Trigger-Bereich
+                .zIndex(1f)
+                .background(Color.Transparent) // DEBUG: Transparenter Bereich sichtbar machen
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            Log.d("GestureDebug", "Drag started at: ${offset.x}, ${offset.y}")
+                            isDragging = true
+                            dragStartY = offset.y
+                            currentDragY = offset.y
+                        },
+                        onDragEnd = {
+                            Log.d("GestureDebug", "Drag ended. Distance: ${currentDragY - dragStartY}")
+                            if (isDragging) {
+                                val dragDistance = currentDragY - dragStartY
+                                if (dragDistance > triggerThreshold) {
+                                    Log.d("GestureDebug", "Threshold reached! Opening overlay")
+                                    overlayState = OverlayState.PATIENT_DATA
+                                } else {
+                                    Log.d("GestureDebug", "Threshold not reached: $dragDistance < $triggerThreshold")
+                                }
+                                isDragging = false
+                                currentDragY = 0f
+                                dragStartY = 0f
+                            }
+                        }
+                    ) { change, _ ->
+                        if (isDragging) {
+                            currentDragY = change.position.y
+                            val dragDistance = currentDragY - dragStartY
+                            Log.d("GestureDebug", "Dragging: distance = $dragDistance")
+                        }
+                    }
+                }
+        )
 
-            Column(
+        // DEBUG: Drag Indicator während des Ziehens
+        if (isDragging) {
+            val progress = ((currentDragY - dragStartY) / triggerThreshold).coerceIn(0f, 1.2f)
+
+            Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 20.dp)
+                    .padding(top = 60.dp)
                     .zIndex(2f),
-                horizontalAlignment = Alignment.CenterHorizontally
+                color = Color.Blue.copy(alpha = 0.8f),
+                shape = RoundedCornerShape(8.dp)
             ) {
-                // Drag Handle
-                Box(
-                    modifier = Modifier
-                        .width((40 + progress * 40).dp)
-                        .height(4.dp)
-                        .background(
-                            Color.Gray.copy(alpha = 0.3f + progress * 0.7f),
-                            RoundedCornerShape(2.dp)
-                        )
+                Text(
+                    text = "Progress: ${(progress * 100).toInt()}%",
+                    modifier = Modifier.padding(12.dp),
+                    color = Color.White
                 )
-
-                // Progress Text
-                if (progress > 0.4f) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = progress),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    ) {
-                        Text(
-                            text = if (progress > 0.9f) "Loslassen!" else "Patientendaten...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                        )
-                    }
-                }
             }
         }
 
-        // Overlay Content mit Animation
-        AnimatedVisibility(
-            visible = overlayState != OverlayState.HIDDEN,
-            enter = slideInVertically(
-                initialOffsetY = { -it },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ) + fadeIn(animationSpec = tween(300)),
-            exit = slideOutVertically(
-                targetOffsetY = { -it },
-                animationSpec = tween(250, easing = EaseInOut)
-            ) + fadeOut(animationSpec = tween(200)),
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(10f)
-        ) {
-            when (overlayState) {
-                OverlayState.PATIENT_DATA -> {
-                    // Semi-transparenter Hintergrund
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.4f))
-                            .pointerInput(Unit) {
-                                // Verhindert Gesten durch das Overlay hindurch
-                                detectDragGestures { _, _ -> }
-                            }
-                    ) {
-                        PatientDataOverlay(
-                            onDismiss = {
-                                overlayState = OverlayState.HIDDEN
-                            },
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 40.dp)
-                        )
-                    }
-                }
-                OverlayState.SAMPLER -> {
-                    TemporaryOverlay("SAMPLER-Schema") {
-                        overlayState = OverlayState.HIDDEN
-                    }
-                }
-                OverlayState.XABCDE -> {
-                    TemporaryOverlay("xABCDE-Schema") {
-                        overlayState = OverlayState.HIDDEN
-                    }
-                }
-                OverlayState.HIDDEN -> {
-                    // Sollte nicht erreicht werden
-                }
-            }
-        }
-    }
-}
+        // Overlay Content
+        if (overlayState == OverlayState.PATIENT_DATA) {
+            Log.d("GestureDebug", "Rendering PatientDataOverlay")
 
-/**
- * Temporärer Overlay-Placeholder für zukünftige Features
- */
-@Composable
-private fun TemporaryOverlay(
-    title: String,
-    onDismiss: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .pointerInput(Unit) {
-                // Verhindert Gesten durch das Overlay hindurch
-                detectDragGestures { _, _ -> }
-            }
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .fillMaxHeight(0.6f)
-                .align(Alignment.Center),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-        ) {
-            Column(
+            // Semi-transparenter Hintergrund
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .zIndex(10f)
+                    .pointerInput(Unit) {
+                        // Verhindert Gesten durch das Overlay hindurch
+                        detectDragGestures { _, _ -> }
+                    }
+            ) {
+                PatientDataOverlay(
+                    onDismiss = {
+                        Log.d("GestureDebug", "Overlay dismissed")
+                        overlayState = OverlayState.HIDDEN
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 80.dp)
+                )
+            }
+        }
+
+        // DEBUG: State Indicator unten rechts
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .zIndex(5f),
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(8.dp)
             ) {
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = "State: $overlayState",
+                    style = MaterialTheme.typography.bodySmall
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Text(
-                    text = "Dieses Feature wird in der nächsten Version implementiert.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Dragging: $isDragging",
+                    style = MaterialTheme.typography.bodySmall
                 )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                if (isDragging) {
+                    Text(
+                        text = "Distance: ${(currentDragY - dragStartY).toInt()}px",
+                        style = MaterialTheme.typography.bodySmall
                     )
-                ) {
-                    Text("Schließen")
                 }
             }
         }

@@ -1,6 +1,7 @@
 // app/src/main/java/com/rdinfo2/ui/components/overlays/PatientDataOverlay.kt
 package com.rdinfo2.ui.components.overlays
 
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.rdinfo2.data.patient.PatientDataManager
@@ -35,11 +37,30 @@ fun PatientDataOverlay(
     val currentPatient = PatientDataManager.currentPatient
     val calculatedValues = PatientDataManager.calculatedValues
 
+    // State für Wischgeste zum Schließen
+    var dragOffset by remember { mutableStateOf(0f) }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(16.dp)),
+            .clip(RoundedCornerShape(16.dp))
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = {
+                        // Wenn nach oben gewischt wurde (negativer Offset)
+                        if (dragOffset < -100) {
+                            onDismiss()
+                        }
+                        dragOffset = 0f
+                    }
+                ) { _, dragAmount ->
+                    // Nur nach oben wischen erlauben
+                    if (dragAmount.y < 0) {
+                        dragOffset += dragAmount.y
+                    }
+                }
+            },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface
@@ -170,49 +191,48 @@ fun AgeSection(
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
                 text = "Alter",
                 style = MaterialTheme.typography.titleMedium
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Years slider
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Jahre: $currentYears",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Slider(
-                        value = currentYears.toFloat(),
-                        onValueChange = { value ->
-                            onAgeChanged(value.toInt(), currentMonths)
-                        },
-                        valueRange = 0f..120f,
-                        steps = 119
-                    )
-                }
+            // Years slider - volle Breite
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Jahre: $currentYears",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Slider(
+                    value = currentYears.toFloat(),
+                    onValueChange = { value ->
+                        onAgeChanged(value.toInt(), currentMonths)
+                    },
+                    valueRange = 0f..120f,
+                    steps = 119,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
-                // Months slider
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Monate: $currentMonths",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Slider(
-                        value = currentMonths.toFloat(),
-                        onValueChange = { value ->
-                            onAgeChanged(currentYears, value.toInt())
-                        },
-                        valueRange = 0f..11f,
-                        steps = 10
-                    )
-                }
+            // Months slider - volle Breite, darunter
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Monate: $currentMonths",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Slider(
+                    value = currentMonths.toFloat(),
+                    onValueChange = { value ->
+                        onAgeChanged(currentYears, value.toInt())
+                    },
+                    valueRange = 0f..11f,
+                    steps = 10,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -321,20 +341,20 @@ fun GenderSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                PatientGender.values().forEach { gender ->
-                    FilterChip(
-                        selected = currentGender == gender,
-                        onClick = { onGenderChanged(gender) },
-                        label = {
-                            Text(when (gender) {
-                                PatientGender.MALE -> "Männlich"
-                                PatientGender.FEMALE -> "Weiblich"
-                                PatientGender.UNKNOWN -> "Unbekannt"
-                            })
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                // Nur MALE und FEMALE, ohne UNKNOWN
+                FilterChip(
+                    selected = currentGender == PatientGender.MALE,
+                    onClick = { onGenderChanged(PatientGender.MALE) },
+                    label = { Text("Männlich") },
+                    modifier = Modifier.weight(1f)
+                )
+
+                FilterChip(
+                    selected = currentGender == PatientGender.FEMALE,
+                    onClick = { onGenderChanged(PatientGender.FEMALE) },
+                    label = { Text("Weiblich") },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }

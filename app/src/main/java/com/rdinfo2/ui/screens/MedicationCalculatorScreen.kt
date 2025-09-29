@@ -1,244 +1,299 @@
 // app/src/main/java/com/rdinfo2/ui/screens/MedicationCalculatorScreen.kt
 package com.rdinfo2.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rdinfo2.data.patient.PatientDataManager
 import com.rdinfo2.data.patient.PatientGender
-import com.rdinfo2.data.model.SimpleMedication
-import com.rdinfo2.data.model.SimpleDoseCalculation
-import com.rdinfo2.logic.DosingCalculator
+import com.rdinfo2.data.json.JsonMedicationLoader
+import com.rdinfo2.data.model.Medication as JsonMedication
+import com.rdinfo2.data.model.Indication as JsonIndication
 
 /**
- * FIXED: MedicationCalculatorScreen mit korrekten Imports
- * Verwendet das neue PatientDataManager System
+ * Medikamentenrechner mit JSON-Datenquelle
  */
+
+enum class InfoTab {
+    INDICATION, CONTRAINDICATION, EFFECT, SIDE_EFFECT
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedicationCalculatorScreen(
     modifier: Modifier = Modifier
 ) {
-    var selectedMedication by remember { mutableStateOf<SimpleMedication?>(null) }
-    var calculation by remember { mutableStateOf<SimpleDoseCalculation?>(null) }
+    val context = LocalContext.current
 
-    // Alle verfügbaren Medikamente
-    val medications = remember { DosingCalculator.getAllMedications() }
+    // Lade Medikamente aus JSON
+    val medications = remember {
+        loadMedicationsFromJson(context)
+    }
 
-    // Beobachte Patientendaten für automatische Neuberechnung
+    // State
+    var selectedMedication by remember { mutableStateOf<JsonMedication?>(null) }
+    var selectedIndication by remember { mutableStateOf<JsonIndication?>(null) }
+    var selectedRoute by remember { mutableStateOf<String?>(null) }
+    var customConcentration by remember { mutableStateOf("") }
+    var selectedInfoTab by remember { mutableStateOf<InfoTab?>(null) }
+
+    // Patient data
     val currentPatient = PatientDataManager.currentPatient
     val calculatedValues = PatientDataManager.calculatedValues
 
-    // Automatische Neuberechnung wenn sich Patientendaten ändern
-    LaunchedEffect(
-        currentPatient.ageYears,
-        currentPatient.ageMonths,
-        calculatedValues.effectiveWeight,
-        selectedMedication
-    ) {
-        selectedMedication?.let { medication ->
-            calculation = DosingCalculator.calculateDose(
-                medication = medication,
-                weightKg = calculatedValues.effectiveWeight,
-                ageMonths = calculatedValues.totalAgeMonths
-            )
+    // Berechnung der Standardkonzentration aus der JSON
+    val standardConcentration = selectedMedication?.let { med ->
+        // Extrahiere Konzentration aus dem preparation String
+        extractConcentration(med.indications.firstOrNull()?.preparation ?: "")
+    } ?: 1.0
+
+    val effectiveConcentration = customConcentration.toDoubleOrNull()
+        ?: standardConcentration
+
+    // Dosisberechnung
+    val calculatedDose = selectedIndication?.let { indication ->
+        val ageGroup = determineAgeGroup(currentPatient.ageYears, currentPatient.ageMonths)
+        val dosageRule = indication.dosageRules.find {
+            it.ageGroup == ageGroup || it.ageGroup == "ALL_AGES"
+        } ?: indication.dosageRules.firstOrNull()
+
+        dosageRule?.let { rule ->
+            val dose = when (rule.calculation.type) {
+                "PER_KG" -> rule.calculation.value * calculatedValues.effectiveWeight
+                "FIXED" -> rule.calculation.value
+                else -> rule.calculation.value
+            }
+
+            // Max/Min Dose prüfen
+            when {
+                rule.calculation.maxDose != null && dose > rule.calculation.maxDose ->
+                    rule.calculation.maxDose
+                rule.calculation.minDose != null && dose < rule.calculation.minDose ->
+                    rule.calculation.minDose
+                else -> dose
+            }
         }
     }
+
+    val calculatedVolume = if (effectiveConcentration > 0 && calculatedDose != null) {
+        calculatedDose / effectiveConcentration
+    } else null
+
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Header
         Text(
             text = "Medikamentenrechner",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 24.dp)
+            color = MaterialTheme.colorScheme.primary
         )
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Patienteninfo-Card
-            item {
-                PatientInfoCard()
-            }
+        // Patienteninfo
+        PatientInfoCard(currentPatient, calculatedValues)
 
-            // Medikamentenauswahl
-            item {
-                MedicationSelectionCard(
-                    medications = medications,
-                    selectedMedication = selectedMedication,
-                    onMedicationSelected = { medication ->
-                        selectedMedication = medication
-                    }
+        // Medikament auswählen
+        MedicationDropdown(
+            medications = medications,
+            selectedMedication = selectedMedication,
+            onMedicationSelected = { medication ->
+                selectedMedication = medication
+                selectedIndication = medication.indications.firstOrNull()
+                selectedRoute = medication.indications.firstOrNull()?.route
+                customConcentration = ""
+                selectedInfoTab = null
+            }
+        )
+
+        // Einsatzfall auswählen
+        selectedMedication?.let { medication ->
+            IndicationDropdown(
+                indications = medication.indications,
+                selectedIndication = selectedIndication,
+                onIndicationSelected = { indication ->
+                    selectedIndication = indication
+                    selectedRoute = indication.route
+                }
+            )
+        }
+
+        // Applikationsart anzeigen
+        selectedIndication?.let { indication ->
+            ApplicationCard(
+                route = indication.route,
+                preparation = indication.preparation
+            )
+        }
+
+        // Konzentration
+        selectedMedication?.let {
+            ConcentrationCard(
+                standardConcentration = standardConcentration,
+                customConcentration = customConcentration,
+                onConcentrationChanged = { customConcentration = it }
+            )
+        }
+
+        // Berechnung
+        if (calculatedDose != null && calculatedVolume != null) {
+            val hasWarning = selectedIndication?.dosageRules
+                ?.firstOrNull()?.calculation?.maxDose?.let {
+                    calculatedDose >= it
+                } == true
+
+            CalculationResultCard(
+                dose = calculatedDose,
+                volume = calculatedVolume,
+                diluentInfo = selectedIndication?.preparation,
+                hasWarning = hasWarning
+            )
+        }
+
+        // Info Buttons - optimiert für Platz
+        selectedMedication?.let { medication ->
+            CompactInfoButtonRow(
+                selectedTab = selectedInfoTab,
+                onTabSelected = { selectedInfoTab = it }
+            )
+
+            // Info Content
+            selectedInfoTab?.let { tab ->
+                InfoContentCard(
+                    tab = tab,
+                    medication = medication
                 )
             }
-
-            // Berechnungsergebnis
-            calculation?.let { calc ->
-                item {
-                    CalculationResultCard(calculation = calc)
-                }
-            }
-
-            // Hinweis wenn kein Medikament ausgewählt
-            if (selectedMedication == null) {
-                item {
-                    HintCard()
-                }
-            }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
 @Composable
-private fun PatientInfoCard() {
-    val currentPatient = PatientDataManager.currentPatient
-    val calculatedValues = PatientDataManager.calculatedValues
-
+private fun PatientInfoCard(
+    patient: com.rdinfo2.data.patient.PatientData,
+    calculatedValues: com.rdinfo2.data.patient.CalculatedPatientValues
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+            Column {
                 Text(
                     text = "Patient",
-                    fontSize = 18.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                val ageText = if (patient.ageMonths > 0) {
+                    "${patient.ageYears}J ${patient.ageMonths}M"
+                } else {
+                    "${patient.ageYears} Jahre"
+                }
+
+                val genderText = when (patient.gender) {
+                    PatientGender.MALE -> "♂"
+                    PatientGender.FEMALE -> "♀"
+                    PatientGender.UNKNOWN -> "?"
+                }
+
+                Text(
+                    text = "$ageText • $genderText",
+                    fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
 
-            // Patientendetails
-            val ageText = if (currentPatient.ageMonths > 0) {
-                "${currentPatient.ageYears} Jahre, ${currentPatient.ageMonths} Monate"
-            } else {
-                "${currentPatient.ageYears} Jahre"
-            }
-
-            val genderText = when (currentPatient.gender) {
-                PatientGender.MALE -> "männlich"
-                PatientGender.FEMALE -> "weiblich"
-                PatientGender.UNKNOWN -> "unbekannt"
-            }
-
-            val weightText = "${String.format("%.1f", calculatedValues.effectiveWeight)} kg" +
-                    if (currentPatient.isManualWeight) "" else " (geschätzt)"
-
             Text(
-                text = "$ageText, $weightText, $genderText",
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                text = "${String.format("%.1f", calculatedValues.effectiveWeight)} kg",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Altersklassifikation
-            val category = when {
-                calculatedValues.isInfant -> "Säugling"
-                calculatedValues.isChild -> "Kind"
-                calculatedValues.isAdolescent -> "Jugendlicher"
-                calculatedValues.isGeriatric -> "Geriatrisch"
-                else -> "Erwachsener"
-            }
-
-            Text(
-                text = category,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-
-            // Risikofaktoren anzeigen
-            if (calculatedValues.riskFactors.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = Color(0xFFFF9800),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Risiken: ${calculatedValues.riskFactors.joinToString(", ") { it.name }}",
-                        fontSize = 12.sp,
-                        color = Color(0xFFFF9800)
-                    )
-                }
-            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MedicationSelectionCard(
-    medications: List<SimpleMedication>,
-    selectedMedication: SimpleMedication?,
-    onMedicationSelected: (SimpleMedication) -> Unit
+private fun MedicationDropdown(
+    medications: List<JsonMedication>,
+    selectedMedication: JsonMedication?,
+    onMedicationSelected: (JsonMedication) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocalPharmacy,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Medikament auswählen",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+    var expanded by remember { mutableStateOf(false) }
 
-            medications.forEach { medication ->
-                MedicationItem(
-                    medication = medication,
-                    isSelected = selectedMedication?.id == medication.id,
-                    onClick = { onMedicationSelected(medication) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Medikament",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = it }
+            ) {
+                OutlinedTextField(
+                    value = selectedMedication?.name ?: "Bitte wählen...",
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                 )
+
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    medications.forEach { medication ->
+                        DropdownMenuItem(
+                            text = { Text(medication.name) },
+                            onClick = {
+                                onMedicationSelected(medication)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -246,205 +301,378 @@ private fun MedicationSelectionCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MedicationItem(
-    medication: SimpleMedication,
-    isSelected: Boolean,
-    onClick: () -> Unit
+private fun IndicationDropdown(
+    indications: List<JsonIndication>,
+    selectedIndication: JsonIndication?,
+    onIndicationSelected: (JsonIndication) -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.secondaryContainer
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-        ),
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
-            Text(
-                text = medication.name,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (isSelected) {
-                    MaterialTheme.colorScheme.onSecondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                }
-            )
+    var expanded by remember { mutableStateOf(false) }
 
-            if (medication.indications.isNotEmpty()) {
-                Text(
-                    text = medication.indications.joinToString(", "),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CalculationResultCard(
-    calculation: SimpleDoseCalculation
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (calculation.isValid) {
-                MaterialTheme.colorScheme.tertiaryContainer
-            } else {
-                MaterialTheme.colorScheme.errorContainer
-            }
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = if (calculation.isValid) "Dosierung" else "Fehler",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (calculation.isValid) {
-                    MaterialTheme.colorScheme.onTertiaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onErrorContainer
-                }
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (calculation.isValid) {
-                // Dosierung
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Dosis:",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "${String.format("%.2f", calculation.dose)} ${calculation.unit}",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Volumen
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Volumen:",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "${String.format("%.1f", calculation.volume)} ml",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Warnungen
-                if (calculation.warnings.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    calculation.warnings.forEach { warning ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = 2.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = Color(0xFFFF9800),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = warning,
-                                fontSize = 14.sp,
-                                color = Color(0xFFFF9800)
-                            )
-                        }
-                    }
-                }
-
-                // Berechnung anzeigen
-                if (calculation.calculation.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        )
-                    ) {
-                        Text(
-                            text = calculation.calculation,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                }
-            } else {
-                // Fehlermeldung
-                Text(
-                    text = calculation.errorMessage ?: "Unbekannter Fehler",
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HintCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "💡 Hinweis",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "Einsatzfall",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = it }
+            ) {
+                OutlinedTextField(
+                    value = selectedIndication?.name ?: "Bitte wählen...",
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                )
 
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    indications.forEach { indication ->
+                        DropdownMenuItem(
+                            text = { Text(indication.name) },
+                            onClick = {
+                                onIndicationSelected(indication)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApplicationCard(
+    route: String,
+    preparation: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Wählen Sie ein Medikament aus der Liste aus, um die Dosierung zu berechnen.",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "Applikationsart",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = route,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
 
             Text(
-                text = "Die Berechnung erfolgt automatisch basierend auf den aktuellen Patientendaten.",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = preparation,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun ConcentrationCard(
+    standardConcentration: Double,
+    customConcentration: String,
+    onConcentrationChanged: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Konzentration",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Text(
+                text = "Standard: $standardConcentration mg/ml",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            OutlinedTextField(
+                value = customConcentration,
+                onValueChange = onConcentrationChanged,
+                label = { Text("Andere Konzentration (mg/ml)") },
+                placeholder = { Text("$standardConcentration") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+    }
+}
+
+@Composable
+private fun CalculationResultCard(
+    dose: Double,
+    volume: Double,
+    diluentInfo: String?,
+    hasWarning: Boolean
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (hasWarning) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                MaterialTheme.colorScheme.tertiaryContainer
+            }
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                if (hasWarning) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = "Berechnung",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Dosis
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Dosis:",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${String.format("%.2f", dose)} mg",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // Volumen
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Volumen:",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${String.format("%.1f", volume)} ml",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Verdünnungsinfo
+            diluentInfo?.let { info ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Zubereitung: $info",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (hasWarning) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "⚠️ Maximaldosis erreicht!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactInfoButtonRow(
+    selectedTab: InfoTab?,
+    onTabSelected: (InfoTab) -> Unit
+) {
+    // Erste Reihe
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        CompactInfoButton(
+            text = "Indikation",
+            isSelected = selectedTab == InfoTab.INDICATION,
+            onClick = { onTabSelected(InfoTab.INDICATION) },
+            modifier = Modifier.weight(1f)
+        )
+
+        CompactInfoButton(
+            text = "Kontra-\nindikation",
+            isSelected = selectedTab == InfoTab.CONTRAINDICATION,
+            onClick = { onTabSelected(InfoTab.CONTRAINDICATION) },
+            modifier = Modifier.weight(1f)
+        )
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // Zweite Reihe
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        CompactInfoButton(
+            text = "Wirkung",
+            isSelected = selectedTab == InfoTab.EFFECT,
+            onClick = { onTabSelected(InfoTab.EFFECT) },
+            modifier = Modifier.weight(1f)
+        )
+
+        CompactInfoButton(
+            text = "Neben-\nwirkung",
+            isSelected = selectedTab == InfoTab.SIDE_EFFECT,
+            onClick = { onTabSelected(InfoTab.SIDE_EFFECT) },
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun CompactInfoButton(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(56.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            contentColor = if (isSelected) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        ),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun InfoContentCard(
+    tab: InfoTab,
+    medication: JsonMedication
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = when (tab) {
+                    InfoTab.INDICATION -> "Indikationen"
+                    InfoTab.CONTRAINDICATION -> "Kontraindikationen"
+                    InfoTab.EFFECT -> "Wirkung"
+                    InfoTab.SIDE_EFFECT -> "Nebenwirkungen"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            val content = when (tab) {
+                InfoTab.INDICATION -> medication.indications.joinToString("\n\n") {
+                    "• ${it.name} (${it.route})"
+                }
+                InfoTab.CONTRAINDICATION -> medication.contraindications.joinToString("\n") { "• $it" }
+                InfoTab.EFFECT -> medication.notes ?: "Keine Informationen verfügbar"
+                InfoTab.SIDE_EFFECT -> medication.warnings.joinToString("\n") { "• $it" }
+            }
+
+            Text(
+                text = content,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
+    }
+}
+
+// Hilfsfunktionen
+private fun loadMedicationsFromJson(context: Context): List<JsonMedication> {
+    return try {
+        JsonMedicationLoader.loadMedications(context)
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
+private fun extractConcentration(preparation: String): Double {
+    // Versuche mg/ml aus dem String zu extrahieren
+    val regex = """(\d+(?:\.\d+)?)\s*mg/ml""".toRegex()
+    return regex.find(preparation)?.groupValues?.get(1)?.toDoubleOrNull() ?: 1.0
+}
+
+private fun determineAgeGroup(years: Int, months: Int): String {
+    val totalMonths = years * 12 + months
+    return when {
+        totalMonths < 12 -> "INFANT"
+        years < 12 -> "CHILD"
+        years < 18 -> "ADOLESCENT"
+        years < 65 -> "ADULT"
+        else -> "GERIATRIC"
     }
 }

@@ -29,6 +29,7 @@ https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/mai
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/logic/VitalParameters.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/components/gesture/GestureOverlayContainer.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/components/gesture/GestureOverlaySystem.kt
+https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/components/gesture/OverlayState.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/components/overlays/PatientDataOverlay.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/screens/MedicationCalculatorScreen.kt
 https://raw.githubusercontent.com/iluvatar80/RDInfo2/refs/heads/main/app/src/main/java/com/rdinfo2/ui/theme/Color.kt

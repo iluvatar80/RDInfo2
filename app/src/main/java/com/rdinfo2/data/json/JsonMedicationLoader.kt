@@ -4,7 +4,8 @@ package com.rdinfo2.data.json
 import android.content.Context
 import android.util.Log
 import kotlinx.serialization.json.Json
-import com.rdinfo2.data.model.*
+import kotlinx.serialization.builtins.ListSerializer
+import com.rdinfo2.data.model.Medication
 import java.io.IOException
 
 /**

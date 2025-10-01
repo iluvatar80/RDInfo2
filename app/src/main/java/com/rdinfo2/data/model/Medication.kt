@@ -2,196 +2,294 @@
 package com.rdinfo2.data.model
 
 /**
- * Medikament-Datenmodell v3.0 für RDInfo2
- * Unterstützt flexible Konzentrationen, Darreichungsformen und Dosierungsregeln
+ * Medikament-Datenmodell für RDInfo2
+ * Basis für flexible, erweiterbare Medikamenten-Datenbank
+ * Orientiert sich an Hamburger Rettungsdienst-Handbuch
  */
 data class Medication(
-    val id: String,
-    val name: String,
-    val genericName: String? = null,
+    val id: String,                              // z.B. "adrenalin"
+    val name: String,                            // z.B. "Adrenalin"
+    val genericName: String? = null,             // z.B. "Epinephrin"
     val category: MedicationCategory,
-    val globalInfo: GlobalInfo,
-    val preparations: List<Preparation>,
-    val useCases: List<UseCase>
+    val indications: List<Indication>,           // Verschiedene Einsatzgebiete
+    val contraindications: List<String> = emptyList(),
+    val warnings: List<String> = emptyList(),
+    val notes: String? = null
 )
 
-data class GlobalInfo(
-    val indications: String,
-    val mechanism: String,
-    val sideEffects: String,
-    val contraindications: String
+data class Indication(
+    val name: String,                            // z.B. "Reanimation"
+    val dosageRules: List<DosageRule>,          // Altersabhängige Dosierungen
+    val route: String,                          // z.B. "i.v."
+    val preparation: String? = null,            // z.B. "unverdünnt"
+    val maxDose: MaxDose? = null
 )
 
-data class Preparation(
-    val id: String,
-    val type: PreparationType,
-    val concentration: Double,
-    val concentrationUnit: String,
-    val volume: Double,
-    val volumeUnit: String,
-    val description: String
-) {
-    /**
-     * Berechnet Konzentration pro ml (nur wenn volumeUnit = "ml")
-     */
-    fun getConcentrationPerMl(): Double? {
-        return if (volumeUnit == "ml" && volume > 0) {
-            concentration / volume
-        } else null
-    }
-
-    /**
-     * Formatierte Anzeige der Konzentration
-     */
-    fun getConcentrationDisplay(): String {
-        return "$concentration $concentrationUnit / $volume $volumeUnit"
-    }
-
-    /**
-     * Formatierte Anzeige "1ml = X mg" (nur wenn relevant)
-     */
-    fun getConcentrationPerMlDisplay(): String? {
-        return getConcentrationPerMl()?.let { perMl ->
-            "1 ml = ${String.format("%.2f", perMl)} $concentrationUnit"
-        }
-    }
-
-    /**
-     * Prüft ob Trockensubstanz (volume = 0)
-     */
-    fun isDrySubstance(): Boolean {
-        return volume == 0.0
-    }
-}
-
-data class UseCase(
-    val id: String,
-    val name: String,
-    val route: String,
-    val preparation: UseCasePreparation,
-    val dosingRules: List<DosingRule>
-)
-
-data class UseCasePreparation(
-    val preparationId: String,
-    val dilution: Dilution? = null,
-    val nebulization: Nebulization? = null
-)
-
-data class Dilution(
-    val ratio: String? = null,
-    val solvent: String? = null,
-    val finalConcentration: Double? = null,
-    val finalConcentrationUnit: String? = null,
-    val finalVolume: Double? = null,
-    val finalVolumeUnit: String? = null,
-    val note: String? = null
-)
-
-data class Nebulization(
-    val dose: Double? = null,
-    val doseUnit: String? = null,
-    val oxygenFlow: Int? = null,
-    val oxygenFlowUnit: String? = null
-)
-
-data class DosingRule(
-    val ruleId: String,
-    val minAge: Int?,
-    val maxAge: Int?,
-    val minWeight: Double?,
-    val maxWeight: Double?,
+data class DosageRule(
+    val ageGroup: AgeGroup,
     val calculation: DosageCalculation,
-    val maxSingleDose: Double? = null,
-    val maxTotalDose: MaxDose? = null,
-    val repetitionInterval: String? = null,
-    val abortCriteria: String? = null,
+    val unit: String,                           // mg, ml, Hub, etc.
+    val volume: String? = null,                 // z.B. "1 ml (1:1000)"
     val note: String? = null
 )
 
 data class DosageCalculation(
     val type: CalculationType,
-    val value: Double,
-    val unit: String
+    val value: Double,                          // Basis-Wert für Berechnung
+    val minDose: Double? = null,
+    val maxDose: Double? = null
 )
 
 data class MaxDose(
     val amount: Double,
     val unit: String,
-    val timeframe: String
+    val timeframe: String,                      // z.B. "pro Einsatz"
+    val warning: String? = null
 )
 
-enum class PreparationType {
-    AMPULE,
-    DRY_SUBSTANCE,
-    SUPPOSITORY,
-    SPRAY,
-    NEBULIZER_SOLUTION,
-    INFUSION,
-    TABLET,
-    AUTOINJECTOR,
+enum class MedicationCategory {
+    CARDIOVASCULAR,     // Herz-Kreislauf
+    RESPIRATORY,        // Atemwege
+    NEUROLOGICAL,       // Neurologie
+    METABOLIC,          // Stoffwechsel
+    ANALGESIC,          // Schmerzmittel
+    SEDATIVE,           // Sedierung
+    ANTIDOTE,           // Gegenmittel
     OTHER
 }
 
-enum class MedicationCategory {
-    CARDIOVASCULAR,
-    RESPIRATORY,
-    NEUROLOGICAL,
-    METABOLIC,
-    ANALGESIC,
-    SEDATIVE,
-    ANTIDOTE,
-    ANTIHISTAMINE,
-    CORTICOSTEROID,
-    ANTIHYPERTENSIVE,
-    OTHER
+enum class AgeGroup {
+    NEONATE,           // 0-28 Tage
+    INFANT,            // 1-12 Monate
+    TODDLER,           // 1-2 Jahre
+    CHILD,             // 3-11 Jahre
+    ADOLESCENT,        // 12-17 Jahre
+    ADULT,             // 18-64 Jahre
+    GERIATRIC,         // 65+ Jahre
+    ALL_AGES           // Für universelle Dosierungen
 }
 
 enum class CalculationType {
-    FIXED,
-    PER_KG
+    FIXED,             // Feste Dosis
+    PER_KG,            // Pro kg Körpergewicht
+    PER_YEAR,          // Pro Lebensjahr
+    FORMULA            // Spezielle Formel
 }
 
 /**
- * Manuelle Konzentrations-Override für Session
+ * Hilfsfunktionen für die Medikamenten-Erstellung
  */
-data class ConcentrationOverride(
-    val medicationId: String,
-    val concentration: Double,
-    val concentrationUnit: String,
-    val volume: Double,
-    val volumeUnit: String
-) {
-    fun getConcentrationDisplay(): String {
-        return "$concentration $concentrationUnit / $volume $volumeUnit"
+object MedicationFactory {
+
+    /**
+     * Erstellt Adrenalin basierend auf Hamburger Rettungsdienst-Handbuch
+     */
+    fun createAdrenaline(): Medication {
+        return Medication(
+            id = "adrenalin",
+            name = "Adrenalin",
+            genericName = "Epinephrin",
+            category = MedicationCategory.CARDIOVASCULAR,
+            indications = listOf(
+                // Reanimation
+                Indication(
+                    name = "Reanimation",
+                    route = "i.v./i.o.",
+                    preparation = "unverdünnt (1:1000)",
+                    dosageRules = listOf(
+                        DosageRule(
+                            ageGroup = AgeGroup.NEONATE,
+                            calculation = DosageCalculation(
+                                type = CalculationType.PER_KG,
+                                value = 0.01,
+                                minDose = 0.01
+                            ),
+                            unit = "mg",
+                            volume = "entsprechend ml (1:1000)"
+                        ),
+                        DosageRule(
+                            ageGroup = AgeGroup.INFANT,
+                            calculation = DosageCalculation(
+                                type = CalculationType.PER_KG,
+                                value = 0.01,
+                                minDose = 0.01,
+                                maxDose = 1.0
+                            ),
+                            unit = "mg",
+                            volume = "entsprechend ml (1:1000)"
+                        ),
+                        DosageRule(
+                            ageGroup = AgeGroup.CHILD,
+                            calculation = DosageCalculation(
+                                type = CalculationType.PER_KG,
+                                value = 0.01,
+                                maxDose = 1.0
+                            ),
+                            unit = "mg",
+                            volume = "entsprechend ml (1:1000)"
+                        ),
+                        DosageRule(
+                            ageGroup = AgeGroup.ADULT,
+                            calculation = DosageCalculation(
+                                type = CalculationType.FIXED,
+                                value = 1.0
+                            ),
+                            unit = "mg",
+                            volume = "1 ml (1:1000)"
+                        )
+                    ),
+                    maxDose = MaxDose(5.0, "mg", "pro Einsatz", "bei Überschreitung Rücksprache")
+                ),
+
+                // Anaphylaxie
+                Indication(
+                    name = "Anaphylaxie",
+                    route = "i.m.",
+                    preparation = "unverdünnt",
+                    dosageRules = listOf(
+                        DosageRule(
+                            ageGroup = AgeGroup.CHILD,
+                            calculation = DosageCalculation(
+                                type = CalculationType.FIXED,
+                                value = 0.15
+                            ),
+                            unit = "mg",
+                            volume = "0.15 ml",
+                            note = "Oberschenkel lateral"
+                        ),
+                        DosageRule(
+                            ageGroup = AgeGroup.ADOLESCENT,
+                            calculation = DosageCalculation(
+                                type = CalculationType.FIXED,
+                                value = 0.3
+                            ),
+                            unit = "mg",
+                            volume = "0.3 ml"
+                        ),
+                        DosageRule(
+                            ageGroup = AgeGroup.ADULT,
+                            calculation = DosageCalculation(
+                                type = CalculationType.FIXED,
+                                value = 0.5
+                            ),
+                            unit = "mg",
+                            volume = "0.5 ml"
+                        )
+                    )
+                )
+            ),
+            warnings = listOf(
+                "Extravasation vermeiden",
+                "Bei Herzrhythmusstörungen Vorsicht"
+            ),
+            contraindications = listOf(
+                "Keine absoluten Kontraindikationen in Notfallsituationen"
+            )
+        )
     }
 
-    fun getConcentrationPerMl(): Double? {
-        return if (volumeUnit == "ml" && volume > 0) {
-            concentration / volume
-        } else null
+    /**
+     * Erstellt Atropin basierend auf Rettungsdienst-Protokoll
+     */
+    fun createAtropine(): Medication {
+        return Medication(
+            id = "atropin",
+            name = "Atropin",
+            category = MedicationCategory.CARDIOVASCULAR,
+            indications = listOf(
+                Indication(
+                    name = "Bradykardie",
+                    route = "i.v.",
+                    preparation = "langsam injizieren",
+                    dosageRules = listOf(
+                        DosageRule(
+                            ageGroup = AgeGroup.CHILD,
+                            calculation = DosageCalculation(
+                                type = CalculationType.PER_KG,
+                                value = 0.02,
+                                minDose = 0.1,
+                                maxDose = 1.0
+                            ),
+                            unit = "mg"
+                        ),
+                        DosageRule(
+                            ageGroup = AgeGroup.ADULT,
+                            calculation = DosageCalculation(
+                                type = CalculationType.FIXED,
+                                value = 0.5,
+                                maxDose = 3.0
+                            ),
+                            unit = "mg"
+                        )
+                    ),
+                    maxDose = MaxDose(3.0, "mg", "pro Einsatz")
+                )
+            ),
+            warnings = listOf(
+                "Kann Tachykardie auslösen",
+                "Bei Glaukom Vorsicht"
+            )
+        )
     }
 
-    fun getConcentrationPerMlDisplay(): String? {
-        return getConcentrationPerMl()?.let { perMl ->
-            "1 ml = ${String.format("%.2f", perMl)} $concentrationUnit"
-        }
+    /**
+     * Erstellt Glucose 40% für Hypoglykämie
+     */
+    fun createGlucose40(): Medication {
+        return Medication(
+            id = "glucose_40",
+            name = "Glucose 40%",
+            category = MedicationCategory.METABOLIC,
+            indications = listOf(
+                Indication(
+                    name = "Hypoglykämie",
+                    route = "i.v.",
+                    preparation = "über großlumigen Zugang",
+                    dosageRules = listOf(
+                        DosageRule(
+                            ageGroup = AgeGroup.INFANT,
+                            calculation = DosageCalculation(
+                                type = CalculationType.PER_KG,
+                                value = 2.0
+                            ),
+                            unit = "ml"
+                        ),
+                        DosageRule(
+                            ageGroup = AgeGroup.CHILD,
+                            calculation = DosageCalculation(
+                                type = CalculationType.PER_KG,
+                                value = 1.0
+                            ),
+                            unit = "ml"
+                        ),
+                        DosageRule(
+                            ageGroup = AgeGroup.ADULT,
+                            calculation = DosageCalculation(
+                                type = CalculationType.FIXED,
+                                value = 50.0
+                            ),
+                            unit = "ml"
+                        )
+                    )
+                )
+            ),
+            warnings = listOf(
+                "Paravasation vermeiden!",
+                "Kann Gewebe nekrotisieren"
+            )
+        )
     }
 }
 
 /**
- * Berechnungsergebnis mit allen Details
+ * Standard-Medikamenten-Set für Rettungsdienst
  */
-data class DoseCalculationResult(
-    val isValid: Boolean,
-    val dose: Double,
-    val doseUnit: String,
-    val volume: Double,
-    val volumeUnit: String,
-    val calculation: String,
-    val warnings: List<String> = emptyList(),
-    val errorMessage: String? = null,
-    val usedRule: DosingRule? = null,
-    val usedPreparation: Preparation? = null,
-    val usedOverride: ConcentrationOverride? = null
-)
+object EmergencyMedications {
+    fun getStandardSet(): List<Medication> {
+        return listOf(
+            MedicationFactory.createAdrenaline(),
+            MedicationFactory.createAtropine(),
+            MedicationFactory.createGlucose40()
+        )
+    }
+}

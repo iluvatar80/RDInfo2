@@ -2,188 +2,180 @@
 package com.rdinfo2.logic
 
 import com.rdinfo2.data.model.*
-import kotlin.math.roundToInt
+import kotlin.math.round
 
 /**
- * Berechnet Medikamentendosierungen basierend auf Patientendaten
+ * Vereinfachter DosingCalculator ohne Konflikte
+ * Funktioniert mit bereinigten Datenmodellen
  */
 object DosingCalculator {
 
     /**
-     * Berechnet Dosis für ein Medikament und einen spezifischen UseCase
+     * Hauptberechnung für Medikamentendosierung
      */
     fun calculateDose(
-        medication: Medication,
-        useCase: UseCase,
+        medication: SimpleMedication,
         weightKg: Double,
-        ageYears: Int,
-        concentrationOverride: ConcentrationOverride? = null
-    ): DoseCalculationResult {
+        ageMonths: Int
+    ): SimpleDoseCalculation {
 
-        // Passende Dosierungsregel finden
-        val applicableRule = findApplicableRule(useCase.dosingRules, ageYears, weightKg)
-            ?: return DoseCalculationResult(
-                isValid = false,
-                dose = 0.0,
-                doseUnit = "",
-                volume = 0.0,
-                volumeUnit = "ml",
-                calculation = "",
-                errorMessage = "Keine passende Dosierungsregel für Alter $ageYears Jahre und Gewicht $weightKg kg gefunden"
-            )
-
-        // Preparation ermitteln
-        val preparation = medication.preparations.find { it.id == useCase.preparation.preparationId }
-            ?: return DoseCalculationResult(
-                isValid = false,
-                dose = 0.0,
-                doseUnit = "",
-                volume = 0.0,
-                volumeUnit = "ml",
-                calculation = "",
-                errorMessage = "Preparation nicht gefunden: ${useCase.preparation.preparationId}"
-            )
-
-        // Dosis berechnen
-        val calculatedDose = when (applicableRule.calculation.type) {
-            CalculationType.FIXED -> applicableRule.calculation.value
-            CalculationType.PER_KG -> applicableRule.calculation.value * weightKg
+        // Input validation
+        if (weightKg <= 0) {
+            return SimpleDoseCalculation.invalid("Gewicht muss größer als 0 kg sein")
         }
 
-        // Konzentration bestimmen (Override oder Standard)
-        val effectiveConcentration: Double
-        val effectiveConcentrationUnit: String
-        val effectiveVolume: Double
-        val effectiveVolumeUnit: String
-
-        if (concentrationOverride != null) {
-            effectiveConcentration = concentrationOverride.concentration
-            effectiveConcentrationUnit = concentrationOverride.concentrationUnit
-            effectiveVolume = concentrationOverride.volume
-            effectiveVolumeUnit = concentrationOverride.volumeUnit
-        } else {
-            effectiveConcentration = preparation.concentration
-            effectiveConcentrationUnit = preparation.concentrationUnit
-            effectiveVolume = preparation.volume
-            effectiveVolumeUnit = preparation.volumeUnit
+        if (ageMonths < 0) {
+            return SimpleDoseCalculation.invalid("Alter kann nicht negativ sein")
         }
 
-        // Volumen berechnen
-        val calculatedVolume = if (effectiveVolume > 0) {
-            calculatedDose / (effectiveConcentration / effectiveVolume)
-        } else {
-            0.0 // Trockensubstanz
-        }
+        // Altersbereich prüfen
+        medication.ageRestrictions?.let { restrictions ->
+            val minAge = restrictions.minAgeMonths ?: 0
+            val maxAge = restrictions.maxAgeMonths ?: Int.MAX_VALUE
 
-        // Berechnungstext erstellen
-        val calculationText = buildCalculationText(
-            applicableRule = applicableRule,
-            calculatedDose = calculatedDose,
-            weightKg = weightKg,
-            effectiveConcentration = effectiveConcentration,
-            effectiveConcentrationUnit = effectiveConcentrationUnit,
-            effectiveVolume = effectiveVolume,
-            effectiveVolumeUnit = effectiveVolumeUnit,
-            calculatedVolume = calculatedVolume,
-            concentrationOverride = concentrationOverride
-        )
-
-        // Warnungen sammeln
-        val warnings = mutableListOf<String>()
-
-        // MaxDose prüfen
-        applicableRule.maxTotalDose?.let { maxDose ->
-            if (calculatedDose > maxDose.amount) {
-                warnings.add("Maximaldosis überschritten: ${maxDose.amount} ${maxDose.unit} ${maxDose.timeframe}")
+            if (ageMonths < minAge || ageMonths > maxAge) {
+                val ageYears = ageMonths / 12.0
+                return SimpleDoseCalculation.invalid(
+                    "Medikament nicht für Alter ${String.format("%.1f", ageYears)} Jahre zugelassen"
+                )
             }
         }
-
-        // Abbruchkriterien hinzufügen
-        applicableRule.abortCriteria?.let {
-            warnings.add("Abbruchkriterien: $it")
-        }
-
-        return DoseCalculationResult(
-            isValid = true,
-            dose = calculatedDose,
-            doseUnit = applicableRule.calculation.unit,
-            volume = calculatedVolume,
-            volumeUnit = effectiveVolumeUnit,
-            calculation = calculationText,
-            warnings = warnings,
-            usedRule = applicableRule,
-            usedPreparation = preparation,
-            usedOverride = concentrationOverride
-        )
-    }
-
-    /**
-     * Findet die passende Dosierungsregel basierend auf Alter und Gewicht
-     */
-    private fun findApplicableRule(
-        rules: List<DosingRule>,
-        ageYears: Int,
-        weightKg: Double
-    ): DosingRule? {
-        return rules.find { rule ->
-            val ageMatch = (rule.minAge == null || ageYears >= rule.minAge) &&
-                    (rule.maxAge == null || ageYears <= rule.maxAge)
-            val weightMatch = (rule.minWeight == null || weightKg >= rule.minWeight) &&
-                    (rule.maxWeight == null || weightKg <= rule.maxWeight)
-            ageMatch && weightMatch
-        }
-    }
-
-    /**
-     * Erstellt lesbaren Berechnungstext
-     */
-    private fun buildCalculationText(
-        applicableRule: DosingRule,
-        calculatedDose: Double,
-        weightKg: Double,
-        effectiveConcentration: Double,
-        effectiveConcentrationUnit: String,
-        effectiveVolume: Double,
-        effectiveVolumeUnit: String,
-        calculatedVolume: Double,
-        concentrationOverride: ConcentrationOverride?
-    ): String {
-        val sb = StringBuilder()
 
         // Dosisberechnung
-        when (applicableRule.calculation.type) {
-            CalculationType.FIXED -> {
-                sb.append("Dosis: ${applicableRule.calculation.value} ${applicableRule.calculation.unit} (fix)\n")
+        val calculatedDose = when {
+            medication.dosePerKg != null -> {
+                // Gewichtsbasierte Dosierung
+                weightKg * medication.dosePerKg
             }
-            CalculationType.PER_KG -> {
-                sb.append("Dosis: ${applicableRule.calculation.value} ${applicableRule.calculation.unit}/kg × $weightKg kg = ")
-                sb.append("${String.format("%.2f", calculatedDose)} ${applicableRule.calculation.unit}\n")
+            medication.fixedDose != null -> {
+                // Fixe Dosierung
+                medication.fixedDose
+            }
+            else -> {
+                return SimpleDoseCalculation.invalid("Keine Dosierungsregel definiert")
             }
         }
 
-        // Konzentration
-        if (concentrationOverride != null) {
-            sb.append("\nKonzentration (manuell): ${concentrationOverride.getConcentrationDisplay()}\n")
-        } else {
-            sb.append("\nKonzentration: $effectiveConcentration $effectiveConcentrationUnit / $effectiveVolume $effectiveVolumeUnit\n")
+        // Maximaldosis anwenden
+        val finalDose = medication.maxDose?.let { maxDose ->
+            if (calculatedDose > maxDose) maxDose else calculatedDose
+        } ?: calculatedDose
+
+        // Rundung (medizinisch sinnvoll)
+        val roundedDose = round(finalDose * 100) / 100  // 2 Dezimalstellen
+
+        // Volumen berechnen
+        val volume = roundedDose / medication.concentration
+        val roundedVolume = round(volume * 10) / 10  // 1 Dezimalstelle
+
+        // Berechnung als Text
+        val calculation = buildCalculationText(medication, weightKg, ageMonths, calculatedDose, finalDose, roundedDose)
+
+        // Warnungen generieren
+        val warnings = generateWarnings(medication, roundedDose, weightKg, ageMonths)
+
+        return SimpleDoseCalculation(
+            dose = roundedDose,
+            volume = roundedVolume,
+            unit = medication.unit,
+            calculation = calculation,
+            warnings = warnings,
+            isValid = true
+        )
+    }
+
+    /**
+     * Berechnung als lesbarer Text
+     */
+    private fun buildCalculationText(
+        medication: SimpleMedication,
+        weightKg: Double,
+        ageMonths: Int,
+        calculatedDose: Double,
+        finalDose: Double,
+        roundedDose: Double
+    ): String {
+        val ageYears = ageMonths / 12.0
+
+        return buildString {
+            appendLine("Berechnung für ${medication.name}:")
+            appendLine("Patient: ${String.format("%.1f", ageYears)} Jahre, ${weightKg} kg")
+
+            when {
+                medication.dosePerKg != null -> {
+                    appendLine("Dosierung: ${medication.dosePerKg} ${medication.unit}/kg")
+                    appendLine("Berechnet: ${weightKg} kg × ${medication.dosePerKg} = ${String.format("%.2f", calculatedDose)} ${medication.unit}")
+                }
+                medication.fixedDose != null -> {
+                    appendLine("Fixdosis: ${calculatedDose} ${medication.unit}")
+                }
+            }
+
+            if (finalDose != calculatedDose) {
+                appendLine("Maximum angewendet: ${String.format("%.2f", finalDose)} ${medication.unit}")
+            }
+
+            if (roundedDose != finalDose) {
+                appendLine("Gerundet: ${String.format("%.2f", roundedDose)} ${medication.unit}")
+            }
+
+            val volume = roundedDose / medication.concentration
+            appendLine("Volumen: ${String.format("%.1f", volume)} ml")
+        }
+    }
+
+    /**
+     * Warnungen generieren
+     */
+    private fun generateWarnings(
+        medication: SimpleMedication,
+        dose: Double,
+        weightKg: Double,
+        ageMonths: Int
+    ): List<String> {
+        val warnings = mutableListOf<String>()
+
+        // Maximaldosis erreicht
+        medication.maxDose?.let { maxDose ->
+            if (dose >= maxDose * 0.95) {  // 95% der Maximaldosis
+                warnings.add("⚠️ Nahe Maximaldosis erreicht")
+            }
         }
 
-        // Volumenberechnung
-        if (effectiveVolume > 0) {
-            val concPerUnit = effectiveConcentration / effectiveVolume
-            sb.append("= ${String.format("%.2f", concPerUnit)} $effectiveConcentrationUnit/$effectiveVolumeUnit\n")
-            sb.append("\nVolumen: ${String.format("%.2f", calculatedDose)} $effectiveConcentrationUnit ÷ ")
-            sb.append("${String.format("%.2f", concPerUnit)} $effectiveConcentrationUnit/$effectiveVolumeUnit = ")
-            sb.append("${String.format("%.2f", calculatedVolume)} $effectiveVolumeUnit")
-        } else {
-            sb.append("\n⚠ Trockensubstanz - vor Gabe auflösen")
+        // Alterswarnung
+        val ageYears = ageMonths / 12.0
+        when {
+            ageYears < 1 -> warnings.add("⚠️ Säugling - besondere Vorsicht")
+            ageYears > 65 -> warnings.add("⚠️ Geriatrischer Patient")
         }
 
-        // Hinweis aus Rule
-        applicableRule.note?.let {
-            sb.append("\n\nHinweis: $it")
+        // Gewichtswarnung
+        when {
+            weightKg < 5 -> warnings.add("⚠️ Sehr niedriges Gewicht")
+            weightKg > 100 -> warnings.add("⚠️ Adipositas - Dosisanpassung erwägen")
         }
 
-        return sb.toString()
+        return warnings
+    }
+
+    /**
+     * Alle verfügbaren Medikamente abrufen
+     */
+    fun getAllMedications(): List<SimpleMedication> {
+        return StandardMedications.medications
+    }
+
+    /**
+     * Medikament nach ID finden
+     */
+    fun getMedicationById(id: String): SimpleMedication? {
+        return StandardMedications.medications.find { it.id == id }
+    }
+
+    /**
+     * Medikamente nach Kategorie filtern
+     */
+    fun getMedicationsByCategory(category: SimpleMedicationCategory): List<SimpleMedication> {
+        return StandardMedications.medications.filter { it.category == category }
     }
 }
